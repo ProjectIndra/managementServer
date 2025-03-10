@@ -62,30 +62,30 @@ def vm_telemetry(provider_id, subpath):
 
 
 
-def request_vm(provider_id, subpath, method, data):
-    provider_url = "https://pet-muskox-honestly.ngrok-free.app"
-    full_url = f"{provider_url}/{subpath}"
+# def request_vm(provider_id, subpath, method, data):
+#     provider_url = "https://pet-muskox-honestly.ngrok-free.app"
+#     full_url = f"{provider_url}/{subpath}"
 
-    print(f"Proxying request: {method} {full_url}")  # Debugging log
-    print(f"Request data: {data}")  # Debugging log
+#     print(f"Proxying request: {method} {full_url}")  # Debugging log
+#     print(f"Request data: {data}")  # Debugging log
 
-    try:
-        headers = {key: value for key, value in request.headers if key.lower() != 'host'}
+#     try:
+#         headers = {key: value for key, value in request.headers if key.lower() != 'host'}
 
-        response = requests.request(
-            method=method,
-            url=full_url,
-            headers=headers,
-            json=data if method in ["POST", "PUT", "PATCH"] else None,
-            params=request.args,
-            allow_redirects=False
-        )
+#         response = requests.request(
+#             method=method,
+#             url=full_url,
+#             headers=headers,
+#             json=data if method in ["POST", "PUT", "PATCH"] else None,
+#             params=request.args,
+#             allow_redirects=False
+#         )
 
-        print(f"Response from provider: {response.status_code}")  # Debugging log
-        print(f"Response content: {response.text}")  # Debugging log
+#         print(f"Response from provider: {response.status_code}")  # Debugging log
+#         print(f"Response content: {response.text}")  # Debugging log
 
-        return response.content, response.status_code, response.headers.items()
+#         return response.content, response.status_code, response.headers.items()
 
-    except requests.RequestException as e:
-        print(f"Proxy error: {e}")  # Debugging log
-        return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
+#     except requests.RequestException as e:
+#         print(f"Proxy error: {e}")  # Debugging log
+#         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
