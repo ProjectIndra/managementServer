@@ -67,14 +67,21 @@ def vm_creation():
 
 def activate_vm():
     """
-    activating existing inactive VM {params-vm_name,provider_id
+    activating existing inactive VM
     """
     data=request.get_json()
     print(data)
     vm_name=data.get('vm_name','new-vm')
     provider_id=data.get('provider_id',123)
+    return helper_activate_vm(provider_id, vm_name)
 
-    # fetching provider url from the DB using provider_id
+
+def helper_activate_vm(provider_id, vm_name):
+    """
+    helper function to activate existing inactive VM 
+    params-vm_name,provider_id
+    """
+     # fetching provider url from the DB using provider_id
 
     provider_url="https://pet-muskox-honestly.ngrok-free.app"
 
@@ -96,8 +103,10 @@ def deactivate_vm():
     print(data)
     vm_name=data.get('vm_name','new-vm')
     provider_id=data.get('provider_id',123)
+    return helper_deactivate_vm(provider_id, vm_name)
 
-    # fetching provider url from the DB using provider_id
+def helper_deactivate_vm(provider_id, vm_name):
+     # fetching provider url from the DB using provider_id
 
     provider_url="https://pet-muskox-honestly.ngrok-free.app"
 
@@ -119,7 +128,13 @@ def delete_vm():
     print(data)
     vm_name=data.get('vm_name','new-vm')
     provider_id=data.get('provider_id',123)
+    return helper_delete_vm(provider_id, vm_name)
 
+    
+def helper_delete_vm(provider_id,vm_name):
+    """
+    helper function to delete inactivated vms
+    """
     # fetching provider url from the DB using provider_id
 
     provider_url="https://pet-muskox-honestly.ngrok-free.app"
@@ -132,3 +147,4 @@ def delete_vm():
     except requests.RequestException as e:
         print(f"Proxy error: {e}")  # Debugging log
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
+    
