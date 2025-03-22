@@ -170,15 +170,23 @@ def vmCreate_verifyprovider(request):
     """
     try:
         provider_id = request.args.get('provider_id')
-        active_providers = provider_get_requests.providers_lists(request)
-        active_providers_list = active_providers.json.get('active_providers')
+        active_providers, status_code = provider_get_requests.providers_lists(request)  # Unpack the tuple
+        active_providers_list = active_providers.get_json().get('active_providers')  # Use get_json()
+
         provider_ids = [provider.get('provider_id') for provider in active_providers_list]
+
+        if status_code != 200:
+            return jsonify({"error": "Failed to verify the provider"}), 500
+
+
         if provider_id in provider_ids:
             return jsonify({"message": "Provider is active"}), 200
         else:
             return jsonify({"error": "Provider is inactive"}), 400
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
+
 
 def vmCreate_verifyspecs(request):
     """
@@ -188,8 +196,11 @@ def vmCreate_verifyspecs(request):
     try:
         response = provider_get_requests.providers_query(request)
         # return jsonify({"can_create": response.json.get('can_create')}), 200 if response.json.get('can_create') else 500
-        if response.json.get('can_create'):
-            return jsonify({"message": "VM can be created"}), 200
+        if response[1] != 200:
+            return jsonify({"error": "Failed to verify the specs"}), 500
+        
+        if response[0].get_json().get('can_create'):
+             return jsonify({"message": "VM can be created"}), 200
         else:
             return jsonify({"error": "VM can't be created"}), 400
     except Exception as e:
