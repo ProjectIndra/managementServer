@@ -1,8 +1,10 @@
-from flask import jsonify, request
+from flask import jsonify
 
 # internal imports
 from provider_controllers import vm_crud
-from cli_controllers import provider_get_requests
+from ui_cli_controllers import provider_get_requests
+from ui_cli_controllers.helper import helper_activate_vm
+from models.vmsModel import vm_status_collection, vm_details_collection
 
 def vmStatus(subpath):
     """
@@ -62,34 +64,70 @@ def vmStatus_allActiveVms():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 def vmStatus_allVms():
     """
-    This function is responsible
-    for returning the lists of all the inactive vms.
+    Fetch and return the list of all VMs from the database.
     """
+    # try:
+    #     all_vms = list(vm_status_collection.find({}, {"_id": 0}))  # Exclude MongoDB's _id field
+    #     return jsonify({"all_vms": all_vms}), 200
+    # except Exception as e:
+    #     return jsonify({"error": str(e)}), 500
+    # try:
+    #     vm_status_data = [
+    #         {
+    #             "user_id": f"user-{i}",
+    #             "vm_id": f"vm-{i}",
+    #             "vm_name": "Ubuntu" if i % 2 == 0 else "Windows",
+    #             "status": "active" if i % 2 == 0 else "inactive"
+    #         }
+    #         for i in range(1, 11)
+    #     ]
+        
+    #     vm_details_data = [
+    #         {
+    #             "user_id": f"user-{i}",
+    #             "vm_id": f"vm-{i}",
+    #             "vm_name": "Ubuntu" if i % 2 == 0 else "Windows",
+    #             "provider_id": str(i % 3 + 1),
+    #             "provider_name": f"provider-{i % 3 + 1}",
+    #             "vcpu": str(2 + (i % 4)),
+    #             "ram": f"{4 + (i % 4)}GB",
+    #             "storage": f"{50 + (i % 5) * 10}GB",
+    #             "wireguard_ip": f"10.24.{i}.4",
+    #             "wireguard_public_key": f"key-{i}",
+    #             "wireguard_endpoint": f"endpoint-{i}",
+    #             "internal_vm_name": f"internal-vm-{i}"
+    #         }
+    #         for i in range(1, 11)
+    #     ]
+
+    #     vm_status_collection.insert_many(vm_status_data)
+    #     vm_details_collection.insert_many(vm_details_data)
+        
+    #     return {"message": "Dummy VM data inserted successfully"}, 201
+    # except Exception as e:
+    #     return {"error": str(e)}, 500
     try:
-        return jsonify(
-            {
-                "all_vms": [
-                    {
-                        "vm_id": "reddy-vm-1",
-                        "vm_name": "Ubuntu",
-                        "wireguard_ip": "10.24.37.4",
-                        "provider_id": "1",
-                        "provider_name": "provider-1",
-                    },
-                    {
-                        "vm_id": "vm-2",
-                        "vm_name": "Ubuntu",
-                        "wireguard_ip": "12.344.23.4",
-                        "provider_id": "1",
-                        "provider_name": "provider-1",
-                    }
-                ]
-            }
-        ), 200
+        all_vms = []
+        vm_status_list = list(vm_status_collection.find({}, {"_id": 0, "user_id": 1, "vm_id": 1, "vm_name": 1, "status": 1}))
+        
+        for vm in vm_status_list:
+            vm_details = vm_details_collection.find_one(
+                {"vm_id": vm["vm_id"]},
+                {"_id": 0, "provider_id": 1, "provider_name": 1, "vcpu": 1, "ram": 1, "storage": 1, "wireguard_ip": 1, "wireguard_public_key": 1, "wireguard_endpoint": 1, }
+            )
+            
+            if vm_details:
+                vm.update(vm_details)
+            
+            all_vms.append(vm)
+        
+        return {"all_vms": all_vms}, 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
+
 
 def vmStatus_vm_start(request):
     """
@@ -99,7 +137,7 @@ def vmStatus_vm_start(request):
         vm_id = request.args.get('vm_id')
         vm_name = "Ubuntu"
         provider_id = "123"
-        response = vm_crud.helper_activate_vm(provider_id, vm_name)
+        response = helper_activate_vm(provider_id, vm_name)
 
         if response[1] == 200:
             return jsonify({"message": f"VM {vm_id} is successfully started"}), 200

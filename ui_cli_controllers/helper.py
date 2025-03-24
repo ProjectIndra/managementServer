@@ -6,15 +6,6 @@ import time
 from ui_cli_controllers import wg
 from provider_controllers import telemetry
 
-def vm_creation():
-    """
-    This function is responsible for creating new a VM
-    """
-    try:
-        return helper_vm_creation(request)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
 
 def helper_vm_creation(request):
     """
@@ -34,11 +25,6 @@ def helper_vm_creation(request):
             "qvm_path": "/var/lib/libvirt/images/avinash.qcow2",
         }
 
-        # first check whether the server is alive or not
-        providerServer_response = requests.post(f"{provider_url}/")
-        if providerServer_response.status_code != 200:
-            return jsonify({"error": "Provider server is not active"}), 500
-    
         network_list = get_network_list(provider_url)
         if "default" not in network_list.get('active_networks', []) and "default" not in network_list.get('inactive_networks', []):
             create_default_network(provider_url)
@@ -83,21 +69,6 @@ def activate_default_network(provider_url):
 def create_vm(provider_url, vm_data):
     return requests.post(f"{provider_url}/vm/create_qvm", json=vm_data)
 
-
-
-# activating existing inactive VM
-
-def activate_vm():
-    """
-    activating existing inactive VM
-    """
-    data=request.get_json()
-    print(data)
-    vm_name=data.get('vm_name','new-vm')
-    provider_id=data.get('provider_id',123)
-    return helper_activate_vm(provider_id, vm_name)
-
-
 def helper_activate_vm(provider_id, vm_name):
     """
     helper function to activate existing inactive VM 
@@ -116,16 +87,6 @@ def helper_activate_vm(provider_id, vm_name):
         print(f"Proxy error: {e}")  # Debugging log
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
 
-# deactivating activated vms
-def deactivate_vm():
-    """
-    deactivating activated vms{params-vm_name,provider_id}
-    """
-    data=request.get_json()
-    print(data)
-    vm_name=data.get('vm_name','new-vm')
-    provider_id=data.get('provider_id',123)
-    return helper_deactivate_vm(provider_id, vm_name)
 
 def helper_deactivate_vm(provider_id, vm_name):
      # fetching provider url from the DB using provider_id
@@ -140,19 +101,8 @@ def helper_deactivate_vm(provider_id, vm_name):
     except requests.RequestException as e:
         print(f"Proxy error: {e}")  # Debugging log
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
-    
-# deleting inactivated vms
-def delete_vm():
-    """
-    deleting inactivated vms{params-vm_name,provider_id}
-    """
-    data=request.get_json()
-    print(data)
-    vm_name=data.get('vm_name','new-vm')
-    provider_id=data.get('provider_id',123)
-    return helper_delete_vm(provider_id, vm_name)
+  
 
-    
 def helper_delete_vm(provider_id,vm_name):
     """
     helper function to delete inactivated vms
@@ -169,4 +119,4 @@ def helper_delete_vm(provider_id,vm_name):
     except requests.RequestException as e:
         print(f"Proxy error: {e}")  # Debugging log
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
-    
+ 
