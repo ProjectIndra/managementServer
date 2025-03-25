@@ -1,5 +1,7 @@
 from flask import jsonify,request
 
+from ui_cli_controllers import provider_get_requests
+
 # internal imports
 from provider_controllers import vm_crud
 
@@ -9,6 +11,16 @@ def launchVm():
     for launching the vm with the given specs and other details.
     """
     try:
+        # first query the provider that whether it is possible to create a vm with the given specs
+        response=provider_get_requests.providers_query(request)
+        if response[1]!=200:
+            return response
+        if response[1]==200:
+            print(response[0].get_json())
+            if response[0].get_json().get('can_create',False)==False:
+                return jsonify({"error": "Cannot create VM with the given specs"}), 500
+            
+        
         # create the vm with the given specs
         # response=vm_crud.helper_vm_creation(request)
 

@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify,request
 
 # internal imports
 from provider_controllers import vm_crud
@@ -135,12 +135,18 @@ def vmStatus_vm_start(request):
     """
     try:
         vm_id = request.args.get('vm_id')
-        vm_name = "Ubuntu"
-        provider_id = "123"
+        vm_name = "Ubuntu" # Hardcoded for now , need to fetch from db using vm_id , it's the internal name of the vm
+        # fetching internal_vm_name from db using vm_id
+        
+        provider_id = request.args.get('provider_id')
+        print("vm_id",vm_id)
+        print("provider_id",provider_id)
         response = helper_activate_vm(provider_id, vm_name)
 
+        # return {"error": f"VM {vm_id} is successfully started"}, 400
+
         if response[1] == 200:
-            return jsonify({"message": f"VM {vm_id} is successfully started"}), 200
+            return jsonify({"message": f"VM {vm_id} is successfully started"}), 400
         else:
             return jsonify({"error": "Failed to start VM"}), 400
     except Exception as e:
@@ -152,9 +158,13 @@ def vmStatus_vm_stop(request):
     """
     try:
         vm_id = request.args.get('vm_id')
-        vm_name = "Ubuntu"
-        provider_id = "123"
+        vm_name = "Ubuntu" # Hardcoded for now , need to fetch from db using vm_id , it's the internal name of the vm
+        provider_id = request.args.get('provider_id')
+        # print(vm_id)
+        # print(provider_id)
+        # print(request.args)
         response = vm_crud.helper_deactivate_vm(provider_id, vm_name)
+        # return {"error": f"VM {vm_id} is successfully stopped"}, 400
 
         if response[1] == 200:
             return jsonify({"message": f"VM {vm_id} is successfully stopped"}), 200
@@ -169,8 +179,13 @@ def vmStatus_vm_remove(request):
     for removing an inactive vm with the vm_id/vm_name.
     """
     try:
-        is_vm_active = False
         vm_id = request.args.get('vm_id',1234)
+        is_vm_active = False    #need to fetch from db using vm_id if it's active or not
+        provider_id = request.args.get('provider_id',123)
+        # print(vm_id)
+        # print(provider_id)
+
+        return jsonify({"message": "Done"}), 200
         if is_vm_active:
             return jsonify({"error": "VM is still active. To forcefully inactive it try with command 'rm -f' or else first deactivate the vm"}), 500
         else:

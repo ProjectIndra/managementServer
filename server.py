@@ -50,8 +50,8 @@ app.add_url_rule('/ui/wg/connect','connect-wg',wg.connect_wg,methods=['POST'])
 
                                                         # CLI routes
 app.add_url_rule('/vms/<path:subpath>','cli_vms',ui_login_required(vms_get_request.vmStatus),methods=['GET'])
-app.add_url_rule('/cli/vms/launch','cli_launch_vm',vms_post_request.launchVm,methods=['POST'])
-app.add_url_rule('/cli/providers/<path:subpath>','cli_providers',provider_get_requests.providers,methods=['GET'])
+app.add_url_rule('/vms/launch','cli_launch_vm',vms_post_request.launchVm,methods=['POST'])
+app.add_url_rule('/providers/<path:subpath>','cli_providers',provider_get_requests.providers,methods=['GET'])
 
 # auth token verification
 app.add_url_rule('/cli/verifyCliToken', 'verifyCliToken', auth.verify_cli_token, methods=['POST'])
