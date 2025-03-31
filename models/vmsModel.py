@@ -2,15 +2,19 @@ from dbConnection import db  # Import your DB connection
 from marshmallow import Schema, fields
 
 class VMStatusSchema(Schema):
-    user_id = fields.String(required=True)
     vm_id = fields.String(required=True)
     vm_name = fields.String()
     status = fields.String(required=True)
+    provider_id = fields.String()
+    vm_deleted = fields.Boolean(default=False)
+    vm_deleted_at = fields.DateTime()
+
 
 class VMDetailsSchema(Schema):
-    user_id = fields.String(required=True)
+    provider_user_id = fields.String(required=True)
+    client_user_id = fields.String(required=True)
     vm_id = fields.String(required=True)
-    vm_name = fields.String()
+    vm_name = fields.String() #only reference for user
     provider_id = fields.String()
     provider_name = fields.String(required=True)
     vcpu = fields.String(required=True)
@@ -19,7 +23,9 @@ class VMDetailsSchema(Schema):
     wireguard_ip =fields.String()
     wireguard_public_key = fields.String()
     wireguard_endpoint = fields.String()
-    internal_vm_name = fields.String()
+    wireguard_status=fields.Boolean()
+    internal_vm_name = fields.String() #internal reference
+    vm_created_at = fields.DateTime(required=True)
 
 vm_status_schema = VMStatusSchema()
 vm_details_schema = VMDetailsSchema()

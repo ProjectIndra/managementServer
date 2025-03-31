@@ -1,4 +1,5 @@
 from flask import jsonify,request
+from datetime import datetime as dateTime
 
 # internal imports
 from provider_controllers import vm_crud
@@ -39,28 +40,20 @@ def vmStatus_allActiveVms():
     for returning the lists of all the active vms along with their wireguard connection status.
     """
     try:
-        return jsonify(
-            {
-                "active_vms": [
-                    {
-                        "vm_id": "vm-1",
-                        "vm_name": "Ubuntu",
-                        "wireguard_ip": "10.24.37.4",
-                        "wireguard_status": False,
-                        "provider_id": "1",
-                        "provider_name": "provider-1",
-                    },
-                    {
-                        "vm_id": "vm-2",
-                        "vm_name": "Ubuntu",
-                        "wireguard_ip": "12.344.23.4",
-                        "wireguard_status": True,
-                        "provider_id": "1",
-                        "provider_name": "provider-1",
-                    }
-                ]
-            }
-        ), 200
+
+        active_vms_ids= list(vm_status_collection.find({"status": "active"}, {"_id": 0, "vm_id": 1}))
+        # print("active_vms_ids",active_vms_ids)
+        active_vms = []
+        for vm in active_vms_ids:
+            vm_details = vm_details_collection.find_one(
+                {"vm_id": vm["vm_id"]},
+                {"_id": 0, "provider_id":1, "provider_name":1, "wireguard_ip":1, "wireguard_public_key":1, "wireguard_status":1,"vm_name":1}
+            )
+            if vm_details:
+                active_vms.append(vm_details)
+        
+        return jsonify({"active_vms": active_vms}), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -69,49 +62,11 @@ def vmStatus_allVms():
     """
     Fetch and return the list of all VMs from the database.
     """
-    # try:
-    #     all_vms = list(vm_status_collection.find({}, {"_id": 0}))  # Exclude MongoDB's _id field
-    #     return jsonify({"all_vms": all_vms}), 200
-    # except Exception as e:
-    #     return jsonify({"error": str(e)}), 500
-    # try:
-    #     vm_status_data = [
-    #         {
-    #             "user_id": f"user-{i}",
-    #             "vm_id": f"vm-{i}",
-    #             "vm_name": "Ubuntu" if i % 2 == 0 else "Windows",
-    #             "status": "active" if i % 2 == 0 else "inactive"
-    #         }
-    #         for i in range(1, 11)
-    #     ]
-        
-    #     vm_details_data = [
-    #         {
-    #             "user_id": f"user-{i}",
-    #             "vm_id": f"vm-{i}",
-    #             "vm_name": "Ubuntu" if i % 2 == 0 else "Windows",
-    #             "provider_id": str(i % 3 + 1),
-    #             "provider_name": f"provider-{i % 3 + 1}",
-    #             "vcpu": str(2 + (i % 4)),
-    #             "ram": f"{4 + (i % 4)}GB",
-    #             "storage": f"{50 + (i % 5) * 10}GB",
-    #             "wireguard_ip": f"10.24.{i}.4",
-    #             "wireguard_public_key": f"key-{i}",
-    #             "wireguard_endpoint": f"endpoint-{i}",
-    #             "internal_vm_name": f"internal-vm-{i}"
-    #         }
-    #         for i in range(1, 11)
-    #     ]
-
-    #     vm_status_collection.insert_many(vm_status_data)
-    #     vm_details_collection.insert_many(vm_details_data)
-        
-    #     return {"message": "Dummy VM data inserted successfully"}, 201
-    # except Exception as e:
-    #     return {"error": str(e)}, 500
     try:
+        vm_details_collection.update_many({}, {"$set": {"wireguard_status": "inactive","vm_created_at":dateTime.now()}})
+
         all_vms = []
-        vm_status_list = list(vm_status_collection.find({}, {"_id": 0, "user_id": 1, "vm_id": 1, "vm_name": 1, "status": 1}))
+        vm_status_list = list(vm_status_collection.find({}, {"_id": 0, "vm_id": 1, "vm_name": 1, "status": 1}))
         
         for vm in vm_status_list:
             vm_details = vm_details_collection.find_one(
@@ -120,6 +75,7 @@ def vmStatus_allVms():
             )
             
             if vm_details:
+                print('hi')
                 vm.update(vm_details)
             
             all_vms.append(vm)
@@ -141,7 +97,7 @@ def vmStatus_vm_start(request):
         provider_id = request.args.get('provider_id')
         print("vm_id",vm_id)
         print("provider_id",provider_id)
-        response = helper_activate_vm(provider_id, vm_name)
+        response = helper_activate_vm(provider_id, vm_id)
 
         # return {"error": f"VM {vm_id} is successfully started"}, 400
 
@@ -163,7 +119,7 @@ def vmStatus_vm_stop(request):
         # print(vm_id)
         # print(provider_id)
         # print(request.args)
-        response = vm_crud.helper_deactivate_vm(provider_id, vm_name)
+        response = vm_crud.helper_deactivate_vm(provider_id, vm_id)
         # return {"error": f"VM {vm_id} is successfully stopped"}, 400
 
         if response[1] == 200:
@@ -180,18 +136,21 @@ def vmStatus_vm_remove(request):
     """
     try:
         vm_id = request.args.get('vm_id',1234)
-        is_vm_active = False    #need to fetch from db using vm_id if it's active or not
+        # fetch from db using vm_id if it's active or not
+        vm_status = vm_status_collection.find_one({"vm_id": vm_id}, {"_id": 0, "status": 1})
+        if not vm_status:
+            return jsonify({"error": "VM not found"}), 404
+        is_vm_active = vm_status.get('status') == 'active'
+
         provider_id = request.args.get('provider_id',123)
         # print(vm_id)
         # print(provider_id)
 
-        return jsonify({"message": "Done"}), 200
+        # return jsonify({"message": "Done"}), 200
         if is_vm_active:
             return jsonify({"error": "VM is still active. To forcefully inactive it try with command 'rm -f' or else first deactivate the vm"}), 500
         else:
-            vm_name = "Ubuntu"
-            provider_id = "123"
-            response = vm_crud.helper_delete_vm(provider_id, vm_name)
+            response = vm_crud.helper_delete_vm(provider_id, vm_id)
 
             if response[1] == 200:
                 return jsonify({"message": f"Inactive-VM {vm_id} is successfully deleted"}), 200
@@ -207,8 +166,8 @@ def vmStatus_vm_forceRemove(request):
     try:
         vm_id = request.args.get('vm_id')
         vm_name = "Ubuntu"
-        provider_id = "123"
-        response = vm_crud.helper_delete_vm(provider_id, vm_name)
+        provider_id = request.args.get('provider_id')
+        response = vm_crud.helper_delete_vm(provider_id, vm_id)
 
         if response[1] == 200:
             return jsonify({"message": "VM is successfully force deleted"}), 200
@@ -219,7 +178,7 @@ def vmStatus_vm_forceRemove(request):
 
 def vmCreate_verifyprovider(request):
     """
-    This function is responsible for verifying the provider creating the vm.
+    This function is responsible for verifying the provider before creating the vm.
     """
     try:
         provider_id = request.args.get('provider_id')
@@ -244,17 +203,19 @@ def vmCreate_verifyprovider(request):
 def vmCreate_verifyspecs(request):
     """
     This function is responsible
-    for verifying the specs of the vm before creating it.
+    for verifying the specs of the VM before creating it.
     """
     try:
-        response = provider_get_requests.providers_query(request)
-        # return jsonify({"can_create": response.json.get('can_create')}), 200 if response.json.get('can_create') else 500
-        if response[1] != 200:
-            return jsonify({"error": "Failed to verify the specs"}), 500
+        response, status_code = provider_get_requests.providers_query(request)
         
-        if response[0].get_json().get('can_create'):
-             return jsonify({"message": "VM can be created"}), 200
+        if status_code != 200:
+            return jsonify({"error": "Failed to verify the specs"}), 500
+
+        can_create = response.get_json().get('can_create')
+
+        if can_create:
+            return jsonify({"message": "VM can be created"}), 200
         else:
-            return jsonify({"error": "VM can't be created"}), 400
+            return jsonify({"error": "VM can't be created"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

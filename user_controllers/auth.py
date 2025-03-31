@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 from marshmallow import ValidationError
 
 # Internal imports
-from models.authModels import user_schema, user_session_schema
-from models.authModels import users_collection, sessions_collection
+from models.authModels import user_schema, cli_session_schema
+from models.authModels import users_collection, cli_session_collection
 
 bcrypt = Bcrypt()
 
@@ -38,6 +38,11 @@ def register():
             return jsonify({"error": "Email already exists"}), 400
 
         validated_data["password"] = bcrypt.generate_password_hash(validated_data["password"]).decode("utf-8")
+
+        # Encrypt user_id and store it as verification token
+        encrypted_token = cipher.encrypt(data.get('user_id').encode()).decode()
+        validated_data["cli_verification_token"] = encrypted_token
+
 
         try:
             users_collection.insert_one(validated_data)
@@ -81,89 +86,6 @@ def login():
         
         return jsonify({"message": "Login successful", "token": token}), 200    
 
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token has expired"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-def get_cli_verification_token():
-    try:
-        token = request.cookies.get("token")
-        if not token:
-            return jsonify({"error": "Token from cookie is required"}), 400
-
-        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        user_id = decoded_token.get("user_id")
-
-        user = users_collection.find_one({"user_id": user_id})
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-
-        encrypted_token = cipher.encrypt(user_id.encode()).decode()
-        expiry_time = datetime.utcnow() + timedelta(days=30)
-
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "cli_verification_token": encrypted_token,
-                "cli_verification_token_expiry_timestamp": expiry_time
-            }}
-        )
-
-        return jsonify({"cli_verification_token": encrypted_token}), 200
-    
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token has expired"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-def verify_cli_token():
-    try:
-        data = request.json
-        token = data.get("cli_verification_token")
-
-        if not token:
-            return jsonify({"error": "Verification token is required"}), 400
-
-        decrypted_user_id = cipher.decrypt(token.encode()).decode()
-
-        user = users_collection.find_one({"user_id": decrypted_user_id})
-        if not user:
-            return jsonify({"error": "Invalid token"}), 401
-
-        expiry_time = user.get("cli_verification_token_expiry_timestamp")
-        if not expiry_time or datetime.utcnow() > expiry_time:
-            return jsonify({"error": "Token expired"}), 401
-
-        client_id = str(uuid.uuid4())
-        session_token = str(uuid.uuid4())
-        session_expiry_time = datetime.utcnow() + timedelta(days=30)
-
-        session_data = {
-            "user_id": decrypted_user_id,
-            "client_id": client_id,
-            "cli_session_token": session_token,
-            "cli_session_token_expiry_timestamp": session_expiry_time
-        }
-        user_session_schema.load(session_data)  # Validate session data
-
-        sessions_collection.insert_one(session_data)
-
-        return jsonify({
-            "message": "Token verified successfully",
-            "user_id": decrypted_user_id,
-            "client_id": client_id,
-            "session_token": session_token
-        }), 200
-    
-    except ValidationError as e:
-        return jsonify({"error": e.messages}), 400
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token has expired"}), 401
     except jwt.InvalidTokenError:

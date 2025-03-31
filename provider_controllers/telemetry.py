@@ -4,7 +4,9 @@ import requests
 # import jwt
 import os
 from dbConnection import db
-from models import authModels 
+from models import authModels
+from models.vmsModel import vm_details_collection
+
 
 # SECRET_KEY = os.getenv("SECRET_KEY", "your_default_secret_key")
 
@@ -36,13 +38,21 @@ def heartbeat():
 
 def vm_telemetry(provider_id, subpath):
 
-    # get the provider_url through provider_id from db
-
-    provider_url = "https://pet-muskox-honestly.ngrok-free.app"
-    full_url = f"{provider_url}/{subpath}"
 
 
     try:
+        
+        # fetching provider url from the DB using provider_id
+        provider_url_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
+        if not provider_url_response:
+            return jsonify({"error": "Provider not found"}), 404
+        provider_url=provider_url.get('provider_url')
+        if not provider_url:
+            return jsonify({"error": "Provider URL not found"}), 404
+        
+
+        full_url = f"{provider_url}/{subpath}"
+
         headers = {key: value for key, value in request.headers if key.lower() != 'host'}
 
         response = requests.request(

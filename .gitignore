@@ -1,3 +1,4 @@
 .env
 *.pyc
 __pycache__/
+data_insertion_script.py

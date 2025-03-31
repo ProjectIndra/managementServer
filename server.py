@@ -1,13 +1,14 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 
 # internal imports
 import dbConnection  # Import database setup
-from user_controllers import auth  # Import auth routes
+from user_controllers import auth, profile  # Import auth routes
 from provider_controllers import telemetry, vm_crud
-from ui_cli_controllers import provider_get_requests, vms_get_request ,vms_post_request ,wg
+from ui_cli_controllers import provider_get_requests, provider_post_requests, vms_get_request ,vms_post_request ,wg
 from middlewares.auth_middleware import ui_login_required
+from prometheus_controller import prometheus
 
 app = Flask(__name__)
 CORS(app,supports_credentials=True)  # Enable CORS
@@ -20,6 +21,10 @@ dbConnection.setupConnection()
 def home():
     return "Hello, Welcome to the management server",200
 
+app.add_url_rule('/prometheus/query/<path:subpath>', 'metrics', prometheus.query_prometheus, methods=["GET"])
+
+
+
 # provider server telemetry routes 
 app.add_url_rule('/heartbeat','provider-heartbeat',telemetry.heartbeat,methods=['POST'])
 
@@ -28,15 +33,11 @@ app.add_url_rule('/heartbeat','provider-heartbeat',telemetry.heartbeat,methods=[
 app.add_url_rule('/register', 'register', auth.register, methods=['POST'])
 app.add_url_rule('/login', 'login', auth.login, methods=['POST'])
 
-# auth token verification
-app.add_url_rule('/ui/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(auth.get_cli_verification_token), methods=['GET'])
-
-
 
 # vm operations (provider)
-app.add_url_rule('/ui/requestvm','requesting-vm-creation',vm_crud.vm_creation,methods=['POST'])
+# app.add_url_rule('/ui/requestvm','requesting-vm-creation',vm_crud.vm_creation,methods=['POST'])
 # app.add_url_rule('/vm/activate','activating-inactive-vm',ui_login_required(vm_crud.activate_vm),methods=['POST'])
-app.add_url_rule('/ui/vm/deactivate','deactivating-active-vm',vm_crud.deactivate_vm,methods=['POST'])
+# app.add_url_rule('/ui/vm/deactivate','deactivating-active-vm',vm_crud.deactivate_vm,methods=['POST'])
 # app.add_url_rule('ui/vm/delete','deleting-inactive-vm',vm_crud.delete_vm,methods=['POST'])
 
 
@@ -48,13 +49,16 @@ app.add_url_rule('/ui/<provider_id>/<path:subpath>', 'dynamic_proxy', telemetry.
 app.add_url_rule('/ui/wg/connect','connect-wg',wg.connect_wg,methods=['POST'])
 
 
-                                                        # CLI routes
-app.add_url_rule('/vms/<path:subpath>','cli_vms',ui_login_required(vms_get_request.vmStatus),methods=['GET'])
+                                                    # CLI routes
+app.add_url_rule('/vms/<path:subpath>','cli_vms',vms_get_request.vmStatus,methods=['GET'])
 app.add_url_rule('/vms/launch','cli_launch_vm',vms_post_request.launchVm,methods=['POST'])
 app.add_url_rule('/providers/<path:subpath>','cli_providers',provider_get_requests.providers,methods=['GET'])
+app.add_url_rule('/provides/update_config','cli_update_provider_config',provider_post_requests.update_provider_conf,methods=['POST'])
 
-# auth token verification
-app.add_url_rule('/cli/verifyCliToken', 'verifyCliToken', auth.verify_cli_token, methods=['POST'])
+# auth token verification & profile
+app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', profile.verify_cli_token, methods=['POST'])
+app.add_url_rule('/ui/profile/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(profile.get_cli_verification_token), methods=['GET'])
+app.add_url_rule('/ui/profile/getUserDetails', 'getUserDetails', ui_login_required(profile.get_user_details), methods=['GET'])
 
 if __name__ == '__main__':
     try:
