@@ -6,7 +6,7 @@ from flask_bcrypt import Bcrypt
 import dbConnection  # Import database setup
 from user_controllers import auth, profile  # Import auth routes
 from provider_controllers import telemetry, vm_crud
-from ui_cli_controllers import provider_get_requests, provider_post_requests, vms_get_request ,vms_post_request ,wg
+from ui_cli_controllers import provider_get_requests, provider_post_requests, vms_get_request ,vms_post_request ,wg,provider_server
 from middlewares.auth_middleware import ui_login_required
 from prometheus_controller import prometheus
 
@@ -28,10 +28,42 @@ app.add_url_rule('/prometheus/query/<path:subpath>', 'metrics', prometheus.query
 # provider server telemetry routes 
 app.add_url_rule('/heartbeat','provider-heartbeat',telemetry.heartbeat,methods=['POST'])
 
+# vm telemetry
+app.add_url_rule('/ui/<provider_id>/<path:subpath>', 'dynamic_proxy', telemetry.vm_telemetry, methods=['GET', 'POST', 'PUT', 'DELETE'])
+# <path> (without subpath) captures only the first segzment after /vm/.
                                                         # UI Routes
 # User Routes
 app.add_url_rule('/register', 'register', auth.register, methods=['POST'])
 app.add_url_rule('/login', 'login', auth.login, methods=['POST'])
+
+# wg routes
+app.add_url_rule('/ui/wg/connect','connect-wg',wg.connect_wg,methods=['POST'])
+
+                                        # CLI and CLI common routes
+# vms routes
+app.add_url_rule('/vms/<path:subpath>','cli_vms',vms_get_request.vmStatus,methods=['GET'])
+app.add_url_rule('/vms/launch','cli_launch_vm',vms_post_request.launchVm,methods=['POST'])
+
+# provider routes
+app.add_url_rule('/providers/<path:subpath>','cli_ui_providers',provider_get_requests.providers,methods=['GET'])
+app.add_url_rule('/ui/providers/update_config','cli_ui_update_provider_config',provider_post_requests.update_provider_conf,methods=['POST'])
+app.add_url_rule('/ui/providers/providerClientDetails', 'providerClientDetails', ui_login_required(provider_get_requests.provider_client_details), methods=['GET'])
+app.add_url_rule('/ui/providers/userProviderDetails', 'userProviderDetails', ui_login_required(provider_get_requests.get_user_provider_details), methods=['GET'])
+
+
+# auth token verifications
+app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', profile.verify_cli_token, methods=['POST'])
+app.add_url_rule('/ui/profile/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(profile.get_cli_verification_token), methods=['GET'])
+
+
+app.add_url_rule('/providerServer/verifyProviderToken', 'verifyProviderToken', provider_server.verify_provider_token, methods=['POST'])
+app.add_url_rule('/providerServer/getConfig', 'getConfig', provider_server.get_config, methods=['POST'])
+
+
+# profile routes
+app.add_url_rule('/ui/profile/getUserDetails', 'getUserDetails', ui_login_required(profile.get_user_details), methods=['GET'])
+app.add_url_rule('/ui/profile/updateUserDetails', 'updateUserDetails', ui_login_required(profile.update_user_details), methods=['POST'])
+
 
 
 # vm operations (provider)
@@ -40,25 +72,6 @@ app.add_url_rule('/login', 'login', auth.login, methods=['POST'])
 # app.add_url_rule('/ui/vm/deactivate','deactivating-active-vm',vm_crud.deactivate_vm,methods=['POST'])
 # app.add_url_rule('ui/vm/delete','deleting-inactive-vm',vm_crud.delete_vm,methods=['POST'])
 
-
-# vm telemetry
-app.add_url_rule('/ui/<provider_id>/<path:subpath>', 'dynamic_proxy', telemetry.vm_telemetry, methods=['GET', 'POST', 'PUT', 'DELETE'])
-# <path> (without subpath) captures only the first segzment after /vm/.
-
-# wg routes
-app.add_url_rule('/ui/wg/connect','connect-wg',wg.connect_wg,methods=['POST'])
-
-
-                                                    # CLI routes
-app.add_url_rule('/vms/<path:subpath>','cli_vms',vms_get_request.vmStatus,methods=['GET'])
-app.add_url_rule('/vms/launch','cli_launch_vm',vms_post_request.launchVm,methods=['POST'])
-app.add_url_rule('/providers/<path:subpath>','cli_providers',provider_get_requests.providers,methods=['GET'])
-app.add_url_rule('/provides/update_config','cli_update_provider_config',provider_post_requests.update_provider_conf,methods=['POST'])
-
-# auth token verification & profile
-app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', profile.verify_cli_token, methods=['POST'])
-app.add_url_rule('/ui/profile/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(profile.get_cli_verification_token), methods=['GET'])
-app.add_url_rule('/ui/profile/getUserDetails', 'getUserDetails', ui_login_required(profile.get_user_details), methods=['GET'])
 
 if __name__ == '__main__':
     try:

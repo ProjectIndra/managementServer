@@ -1,6 +1,8 @@
 from flask import request, jsonify
 import requests
 import time
+from datetime import datetime
+import uuid
 
 # internal imports
 from ui_cli_controllers import wg
@@ -15,25 +17,37 @@ def helper_vm_creation(request):
     try:
         data = request.get_json()
         # provider_url = 'https://pet-muskox-honestly.ngrok-free.app'
+        vm_name= data.get('vm_name', 'new-vm')
+        vcpus = data.get('vcpus', 2)
+        ram = data.get('ram', 2048)
+        storage = data.get('storage', 20)
+        provider_user_id = data.get('provider_user_id')
+        client_user_id = data.get('client_id')
+        provider_name= data.get('provider_name')
+        vm_image_type = data.get('vm_image_type', 'ubuntu')
+
         
         vm_name = data.get('vm_name', 'new-vm')
         provider_id=data.get('provider_id','f8c52abb-bfa5-44dc-8496-0b0a2fb5c394')
 
         # fetching provider url from the DB using provider_id
-        provider_url_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
-        if not provider_url_response:
+        provider_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
+
+        if not provider_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_url.get('provider_url')
+        provider_url=provider_response.get('provider_url')
+        management_server_verification_token=provider_response.get('management_server_verification_token')
+        
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
 
         vm_data = {
             "name": vm_name,
-            "vcpus": data.get('vcpus'),
-            "memory": data.get('ram'),
-            "storage": data.get('storage'),
-            "image": data.get('vm_image'),
+            "vcpus": vcpus,
+            "memory": ram,
+            "storage": storage,
+            "image": vm_image_type,
             "qvm_path": "/var/lib/libvirt/images/avinash.qcow2",
         }
 
@@ -51,6 +65,38 @@ def helper_vm_creation(request):
             provider_url, data
         )
 
+        vm_id=str(uuid.uuid4())
+        # inserting vm details in the db
+        vm_details = {
+            "provider_user_id": provider_user_id,
+            "client_user_id": client_user_id,
+            # generating uuid for vm_id
+            "vm_id":vm_id,
+            "vm_name": vm_name,
+            # generating unique string as like uuid for internal_vm_name
+            "internal_vm_name": f"{vm_name}-{str(uuid.uuid4())}",
+            "provider_id": provider_id,
+            "provider_name": provider_name,
+            "ram": ram,
+            "vcpu": vcpus,
+            "storage": storage,
+            "vm_image_type":vm_image_type,
+            "vm_creation_time": str(datetime.now()),
+            "wireguard_ip": wireguard_response.get('ip'),
+            "wireguard_public_key": wireguard_response.get('public_key'),
+            "wireguard_status": True,
+        }
+        vm_details_collection.insert_one(vm_details)
+        # inserting vm status in the db
+        vm_status = {
+            "vm_id": vm_id,
+            "vm_name": vm_name,
+            "status": "active",
+            "provider_id": provider_id,
+            "vm_deleted": False,
+            "vm_deleted_at": None
+        }
+        vm_status_collection.insert_one(vm_status)
 
 
         return jsonify({

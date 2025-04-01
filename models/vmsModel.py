@@ -20,6 +20,7 @@ class VMDetailsSchema(Schema):
     vcpu = fields.String(required=True)
     ram = fields.String(required=True)
     storage = fields.String(required=True)
+    vm_image_type = fields.String(required=True)
     wireguard_ip =fields.String()
     wireguard_public_key = fields.String()
     wireguard_endpoint = fields.String()

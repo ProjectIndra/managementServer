@@ -1,9 +1,10 @@
 from flask import jsonify,request
 
-from ui_cli_controllers import provider_get_requests
+from ui_cli_controllers import helper
 
 # internal imports
 from provider_controllers import vm_crud
+from ui_cli_controllers import provider_get_requests
 
 def launchVm():
     """
@@ -22,7 +23,7 @@ def launchVm():
             
         
         # create the vm with the given specs
-        # response=vm_crud.helper_vm_creation(request)
+        response=helper.helper_vm_creation(request)
 
         # if response[1]==200:
         print("launch-vm")

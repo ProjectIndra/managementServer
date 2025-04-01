@@ -58,13 +58,13 @@ def update_provider_conf():
         provider_url = provider.get("provider_url")
 
         response=requests.post(
-            f"{provider_url}/update_config",
+            f"{provider_url}/config/update",
             json={
-                "PROVIDER_SERVER_MAX_RAM": provider_allowed_ram,
-                "PROVIDER_SERVER_MAX_CPU": provider_allowed_vcpu,
-                "PROVIDER_SERVER_MAX_DISK": provider_allowed_storage,
-                "PROVIDER_SERVER_MAX_VMS": provider_allowed_vms,
-                "PROVIDER_SERVER_MAX_NETWORKS": provider_allowed_networks,
+                "max_ram": provider_allowed_ram,
+                "max_cpu": provider_allowed_vcpu,
+                "max_disk": provider_allowed_storage,
+                "max_vms": provider_allowed_vms,
+                "max_networks": provider_allowed_networks,
             }
         )
 
@@ -90,7 +90,6 @@ def update_provider_conf():
         )
 
         
-
         return jsonify({"message": "Provider configuration updated successfully"}), 200
 
     except Exception as e:

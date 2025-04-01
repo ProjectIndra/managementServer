@@ -74,11 +74,8 @@ def vmStatus_allVms():
                 {"_id": 0, "provider_id": 1, "provider_name": 1, "vcpu": 1, "ram": 1, "storage": 1, "wireguard_ip": 1, "wireguard_public_key": 1, "wireguard_endpoint": 1, }
             )
             
-            if vm_details:
-                print('hi')
-                vm.update(vm_details)
             
-            all_vms.append(vm)
+            all_vms.append(vm_details)
         
         return {"all_vms": all_vms}, 200
     except Exception as e:
