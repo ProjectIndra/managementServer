@@ -9,7 +9,7 @@ from ui_cli_controllers import wg
 from provider_controllers import telemetry
 from models.vmsModel import vm_details_collection, vm_status_collection
 
-
+# properly handle the response throughout the status code
 def helper_vm_creation(request):
     """
     This is a helper function responsible for creating a new VM
@@ -42,6 +42,13 @@ def helper_vm_creation(request):
             return jsonify({"error": "Provider URL not found"}), 404
         
 
+        network_list = get_network_list(provider_url, management_server_verification_token)
+
+        if "default" not in network_list.get('active_networks', []) and "default" not in network_list.get('inactive_networks', []):
+            create_default_network(provider_url, management_server_verification_token)
+        elif "default" in network_list.get('inactive_networks', []):
+            activate_default_network(provider_url, management_server_verification_token)
+        
         vm_data = {
             "name": vm_name,
             "vcpus": vcpus,
@@ -50,19 +57,13 @@ def helper_vm_creation(request):
             "image": vm_image_type,
             "qvm_path": "/var/lib/libvirt/images/avinash.qcow2",
         }
-
-        network_list = get_network_list(provider_url)
-        if "default" not in network_list.get('active_networks', []) and "default" not in network_list.get('inactive_networks', []):
-            create_default_network(provider_url)
-        elif "default" in network_list.get('inactive_networks', []):
-            activate_default_network(provider_url)
         
-        vm_response = create_vm(provider_url, vm_data)
+        vm_response = create_vm(provider_url, vm_data, management_server_verification_token)
         vm_response_json = vm_response.json()
 
         
         wireguard_response = wg.setup_wireguard(
-            provider_url, data
+            provider_url, data,management_server_verification_token
         )
 
         vm_id=str(uuid.uuid4())
@@ -107,11 +108,24 @@ def helper_vm_creation(request):
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
 
 
-def get_network_list(provider_url):
-    response = requests.get(f'{provider_url}/network/list')
+def get_network_list(provider_url, management_server_verification_token):
+    """
+    Fetches the list of networks from the provider.
+    """
+    headers = {
+        'authorization': management_server_verification_token
+    }
+    response = requests.get(f"{provider_url}/network/list", headers=headers)
     return response.json()
 
-def create_default_network(provider_url):
+def create_default_network(provider_url, management_server_verification_token):
+    """
+    Creates a default network if it doesn't exist.
+    """
+    headers = {
+        'authorization': management_server_verification_token
+    }
+
     network_data = {
         "name": "default",
         "bridgeName": "virbr1",
@@ -121,13 +135,25 @@ def create_default_network(provider_url):
         "ipRangeEnd": "192.168.122.200",
         "netMask": "255.255.255.0"
     }
-    return requests.post(f"{provider_url}/network/create", json=network_data)
+    return requests.post(f"{provider_url}/network/create", json=network_data, headers=headers)
 
-def activate_default_network(provider_url):
-    return requests.post(f"{provider_url}/network/activate", json={"name": "default"})
+def activate_default_network(provider_url, management_server_verification_token):
+    """
+    Activates the default network if it exists but is inactive.
+    """
+    headers = {
+        'authorization': management_server_verification_token
+    }
+    return requests.post(f"{provider_url}/network/activate", json={"name": "default"}, headers=headers)
 
-def create_vm(provider_url, vm_data):
-    return requests.post(f"{provider_url}/vm/create_qvm", json=vm_data)
+def create_vm(provider_url, vm_data, management_server_verification_token):
+    """
+    Creates a new VM on the provider.
+    """
+    headers = {
+        'authorization': management_server_verification_token
+    }
+    return requests.post(f"{provider_url}/vm/create_qvm", json=vm_data, headers=headers)
 
 def helper_activate_vm(provider_id, vm_id):
     """
@@ -138,12 +164,16 @@ def helper_activate_vm(provider_id, vm_id):
     try:
 
         # fetching provider url from the DB using provider_id
-        provider_url_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
-        if not provider_url_response:
+        provider_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
+        if not provider_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_url.get('provider_url')
+        provider_url=provider_response.get('provider_url')
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
+        
+        management_server_verification_token=provider_response.get('management_server_verification_token')
+        
+
         
         # fetching vm_name from the db using vm_id
         internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id},{"_id":0,"internal_vm_name":1})
@@ -151,7 +181,11 @@ def helper_activate_vm(provider_id, vm_id):
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
 
-        activate_vm_response=requests.post(f"{provider_url}/vm/activate",json={"name":internal_vm_name})
+        headers = {
+            'authorization': management_server_verification_token
+        }
+
+        activate_vm_response=requests.post(f"{provider_url}/vm/activate",json={"name":internal_vm_name},headers=headers)
         # print(activate_vm_response)
         # update status in the db
         vm_status_collection.update_one(
@@ -181,13 +215,19 @@ def helper_deactivate_vm(provider_id, vm_id):
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
+        management_server_verification_token=provider_url_response.get('management_server_verification_token')
+        
         # fetching vm_name from the db using vm_id
         internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id},{"_id":0,"internal_vm_name":1})
         if not internal_vm_name_response:
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
 
-        deactivate_vm_response=requests.post(f"{provider_url}/vm/deactivate",json={"name":internal_vm_name})
+        headers = {
+            'authorization': management_server_verification_token
+        }
+
+        deactivate_vm_response=requests.post(f"{provider_url}/vm/deactivate",json={"name":internal_vm_name},headers=headers)
         # print(deactivate_vm_response)
         # update in the db
         vm_status_collection.update_one(
@@ -213,12 +253,14 @@ def helper_delete_vm(provider_id,vm_id):
     try:
 
         # fetching provider url from the DB using provider_id
-        provider_url_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
-        if not provider_url_response:
+        provider_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
+        if not provider_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_url.get('provider_url')
+        provider_url=provider_response.get('provider_url')
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
+        
+        management_server_verification_token=provider_response.get('management_server_verification_token')
         
         # fetching vm_name from the db using vm_id
         internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id},{"_id":0,"internal_vm_name":1})
@@ -226,7 +268,11 @@ def helper_delete_vm(provider_id,vm_id):
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
 
-        delete_vm_response=requests.post(f"{provider_url}/vm/delete",json={"name":internal_vm_name})
+        headers = {
+            'authorization': management_server_verification_token
+        }
+
+        delete_vm_response=requests.post(f"{provider_url}/vm/delete",json={"name":internal_vm_name},headers=headers)
         # print(delete_vm_response)
         # update status in the db
         vm_status_collection.update_one(

@@ -29,7 +29,7 @@ def connect_wg():
         return jsonify({"error": str(e)}), 500
     
 
-def setup_wireguard(provider_url,data):
+def setup_wireguard(provider_url,data,management_server_verification_token=None):
 
     # first getting ip address of the vm
     vm_id=data.get('vm_id', 123)
@@ -51,12 +51,17 @@ def setup_wireguard(provider_url,data):
     # as of now fetching the wireguard_connection_id from the request but later we need to fetch it from the db using the session token
     wireguard_connection_id = data.get('wireguard_connection_id', 123)
 
+    headers = {
+        'authorization': management_server_verification_token
+    }
+
     response = requests.post(f"{provider_url}/vm/ssh/setup_wireguard", json={
         "vm_ip": vm_ip,
         "client_id": wireguard_connection_id,
         "client_public_key": client_public_key,
         "client_endpoint": client_endpoint
-    })
+    },headers=headers)
+    
     return response.json()
 
 def get_dhcp_ip(provider_url, internal_vm_name):

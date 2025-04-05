@@ -43,10 +43,10 @@ def vm_telemetry(provider_id, subpath):
     try:
         
         # fetching provider url from the DB using provider_id
-        provider_url_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
-        if not provider_url_response:
+        provider=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
+        if not provider:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_url.get('provider_url')
+        provider_url=provider.get('provider_url')
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
@@ -54,6 +54,11 @@ def vm_telemetry(provider_id, subpath):
         full_url = f"{provider_url}/{subpath}"
 
         headers = {key: value for key, value in request.headers if key.lower() != 'host'}
+
+        # also add the token to the headers
+        token =provider.get('management_server_verification_token')
+        if token:
+            headers['authorization'] = token
 
         response = requests.request(
             method=request.method,

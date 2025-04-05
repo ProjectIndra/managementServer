@@ -36,7 +36,7 @@ def update_provider_conf():
         # taking out provider_url using provider_id
         provider = provider_details_collection.find_one(
             {"provider_id": provider_id},
-            {"_id": 0, "provider_url": 1,"provider_used_ram": 1,"provider_used_vcpu": 1,"provider_used_storage": 1,provider_allowed_vms: 1,provider_allowed_networks: 1}
+            {"_id": 0, "provider_url": 1,"provider_used_ram": 1,"provider_used_vcpu": 1,"provider_used_storage": 1,"provider_allowed_vms": 1,"provider_allowed_networks": 1}
         )
         if not provider:
             return jsonify({"error": "Provider not found"}), 404
@@ -57,6 +57,12 @@ def update_provider_conf():
         # Extract the provider URL
         provider_url = provider.get("provider_url")
 
+        management_server_verification_token = provider.get("management_server_verification_token")
+
+        headers = {
+            'authorization': management_server_verification_token
+        }
+
         response=requests.post(
             f"{provider_url}/config/update",
             json={
@@ -65,7 +71,8 @@ def update_provider_conf():
                 "max_disk": provider_allowed_storage,
                 "max_vms": provider_allowed_vms,
                 "max_networks": provider_allowed_networks,
-            }
+            },
+            headers=headers
         )
 
         if response.status_code != 200:

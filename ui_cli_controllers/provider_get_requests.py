@@ -28,7 +28,7 @@ def providers_lists(request):
                 "provider_name": 1,
                 "user_id": 1,
                 "provider_type": 1,
-                "provider_rating": 1
+                "provider_rating": 1,
             }
         )
 
@@ -51,8 +51,6 @@ def providers_lists(request):
             if provider_conf:
                 # Merging provider and configuration details
                 provider.update(provider_conf)
-                # Removing the provider_id from the configuration details
-                provider.pop("provider_id", None)
 
 
         # if providers_list:
