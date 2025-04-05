@@ -2,6 +2,7 @@ from flask import jsonify, request
 import requests
 
 # internal imports
+from ui_cli_controllers import helper
 from models.providers import provider_details_collection, provider_conf_collection
 from models.providers import provider_schema, conf_schema
 from dbConnection import db
@@ -101,3 +102,15 @@ def update_provider_conf():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500 
+
+def providers_query():
+    """
+    This function returns whether the user can create a vm or not with the given requriements for a provider.
+    params:- vcpu,ram,storage,provider_id
+    """
+    try:
+        return helper.providers_query_helper(request)        
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        

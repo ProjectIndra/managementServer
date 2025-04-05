@@ -8,34 +8,120 @@ import uuid
 from ui_cli_controllers import wg
 from provider_controllers import telemetry
 from models.vmsModel import vm_details_collection, vm_status_collection
+from models.providers import provider_details_collection, provider_conf_collection
+
+def providers_query_helper(request):
+    """
+    This function returns whether the user can create a vm or not with the given requriements for a provider.
+    params:- vcpu,ram,storage,provider_id
+    """
+    try:
+        data=request.get_json()
+
+        vcpu=data.get('vcpu')
+        ram=data.get('ram')
+        storage=data.get('storage')
+        provider_id=data.get('provider_id')
+        vm_image_type=data.get('vm_image')
+
+        # print(data)
+
+        # check if at least one of the parameters out of vcpu , ram and storage is provided or not
+        if not (vcpu or ram or storage):
+            return jsonify({"error": "At least one of vcpu, ram or storage is required"}), 400
+        if not provider_id:
+            return jsonify({"error": "Provider Selection is required"}), 400
+        
+        # query the provider details and configuration details and then how much more specs can be used by the client by taking difference of the used and allowed specs
+
+        providers_details=provider_details_collection.find_one(
+            {"provider_id": provider_id},
+            {
+                "_id": 0,  # Exclude MongoDB _id field
+                "provider_used_ram": 1,
+                "provider_used_vcpu": 1,
+                "provider_used_storage": 1,
+                "provider_used_vms": 1,
+                "provider_used_networks": 1,
+                "provider_status": 1,
+            }
+        )
+
+        if not providers_details:
+            return jsonify({"error": "Provider not found"}), 404
+        
+        # Fetching the provider configuration details
+        provider_conf = provider_conf_collection.find_one(
+            {"provider_id": provider_id},
+            {
+                "_id": 0,  # Exclude MongoDB _id field
+                "provider_allowed_ram": 1,
+                "provider_allowed_vcpu": 1,
+                "provider_allowed_storage": 1,
+                "provider_allowed_vms": 1,
+                "provider_allowed_networks": 1
+            }
+        )
+        if not provider_conf:
+            return jsonify({"error": "Provider configuration not found"}), 404
+        
+        # check whether the provider is active or not
+        if providers_details["provider_status"]!="active":
+            return jsonify({"error": "Provider is not active"}), 404
+        
+        # check if the queried specs are less than the difference of the used and allowed specs
+        if ram and int(ram) > (int(provider_conf["provider_allowed_ram"]) - int(providers_details["provider_used_ram"])):
+            return jsonify({"error": "More specs(RAM) already being used by clients.",
+                            "can_create": False
+                            }), 200
+    
+        if vcpu and int(vcpu) > (int(provider_conf["provider_allowed_vcpu"]) - int(providers_details["provider_used_vcpu"])):
+            return jsonify({"error": "More specs(vcpu) already being used by clients.",
+                            "can_create": False
+                            }), 200
+        
+        if storage and int(storage) > (int(provider_conf["provider_allowed_storage"]) - int(providers_details["provider_used_storage"])):
+            return jsonify({"error": "More specs(storage) already being used by clients.",
+                            "can_create": False
+                            }), 200
+        
+        return jsonify({"can_create": True}), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
+
 
 # properly handle the response throughout the status code
-def helper_vm_creation(request):
+def helper_vm_creation(request,client_user_id):
     """
     This is a helper function responsible for creating a new VM
     """
     try:
         data = request.get_json()
+
+        print(data)
         # provider_url = 'https://pet-muskox-honestly.ngrok-free.app'
-        vm_name= data.get('vm_name', 'new-vm')
+        vm_name= data.get('vm_name')
         vcpus = data.get('vcpus', 2)
         ram = data.get('ram', 2048)
         storage = data.get('storage', 20)
         provider_user_id = data.get('provider_user_id')
-        client_user_id = data.get('client_id')
-        provider_name= data.get('provider_name')
-        vm_image_type = data.get('vm_image_type', 'ubuntu')
+        # client_user_id = user.get('user_id')
+        # provider_name= data.get('provider_name')
+        vm_image_type = data.get('vm_image', 'ubuntu')
 
-        
-        vm_name = data.get('vm_name', 'new-vm')
-        provider_id=data.get('provider_id','f8c52abb-bfa5-44dc-8496-0b0a2fb5c394')
+        provider_id=data.get('provider_id')
 
+        # print(client_user_id)
         # fetching provider url from the DB using provider_id
-        provider_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
+        provider_response=provider_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
+        print(provider_response)
 
         if not provider_response:
             return jsonify({"error": "Provider not found"}), 404
         provider_url=provider_response.get('provider_url')
+        print(provider_url)
         management_server_verification_token=provider_response.get('management_server_verification_token')
         
         if not provider_url:
@@ -55,12 +141,13 @@ def helper_vm_creation(request):
             "memory": ram,
             "storage": storage,
             "image": vm_image_type,
-            "qvm_path": "/var/lib/libvirt/images/avinash.qcow2",
+            "qvm_path": "./images/avinash.qcow2",
         }
         
         vm_response = create_vm(provider_url, vm_data, management_server_verification_token)
         vm_response_json = vm_response.json()
 
+        print(vm_response_json)
         
         wireguard_response = wg.setup_wireguard(
             provider_url, data,management_server_verification_token
@@ -77,7 +164,6 @@ def helper_vm_creation(request):
             # generating unique string as like uuid for internal_vm_name
             "internal_vm_name": f"{vm_name}-{str(uuid.uuid4())}",
             "provider_id": provider_id,
-            "provider_name": provider_name,
             "ram": ram,
             "vcpu": vcpus,
             "storage": storage,
