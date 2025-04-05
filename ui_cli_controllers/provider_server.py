@@ -30,8 +30,8 @@ def verify_provider_token():
         provider_allowed_vcpu=data.get('max_cpu')
         provider_allowed_storage=data.get('max_disk')
         provider_ram_capacity=data.get('ram_capacity')
-        provider_vcpu_capacity=data.get('vcpu_capacity')
-        provider_storage_capacity=data.get('storage_capacity')
+        provider_vcpu_capacity=data.get('cpu_capacity')
+        provider_storage_capacity=data.get('disk_capacity')
         provider_url=data.get('provider_url')
 
         if not provider_verification_token:

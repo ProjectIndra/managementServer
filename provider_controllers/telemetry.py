@@ -13,7 +13,7 @@ from models.vmsModel import vm_details_collection
 def heartbeat():
     data = request.json
 
-    print(f"dyyryrh{data}")
+    # print(f"dyyryrh{data}")
     token=data["token"]
     username=data["username"]
     link=data["link"]

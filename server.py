@@ -37,27 +37,27 @@ app.add_url_rule('/register', 'register', auth.register, methods=['POST'])
 app.add_url_rule('/login', 'login', auth.login, methods=['POST'])
 
 # wg routes
-app.add_url_rule('/ui/wg/connect','connect-wg',wg.connect_wg,methods=['POST'])
+app.add_url_rule('/ui/wg/connect','connect-wg',ui_login_required(wg.connect_wg),methods=['POST'])
 
                                         # CLI and CLI common routes
 # vms routes
-app.add_url_rule('/vms/<path:subpath>','cli_vms',vms_get_request.vmStatus,methods=['GET'])
-app.add_url_rule('/vms/launch','cli_launch_vm',vms_post_request.launchVm,methods=['POST'])
+app.add_url_rule('/vms/<path:subpath>','cli_vms',ui_login_required(vms_get_request).vmStatus,methods=['GET'])
+app.add_url_rule('/vms/launch','cli_launch_vm',ui_login_required(vms_post_request).launchVm,methods=['POST'])
 
 # provider routes
-app.add_url_rule('/providers/<path:subpath>','cli_ui_providers',provider_get_requests.providers,methods=['GET'])
-app.add_url_rule('/ui/providers/update_config','cli_ui_update_provider_config',provider_post_requests.update_provider_conf,methods=['POST'])
+app.add_url_rule('/providers/<path:subpath>','cli_ui_providers',ui_login_required(provider_get_requests).providers,methods=['GET'])
+app.add_url_rule('/ui/providers/update_config','cli_ui_update_provider_config',ui_login_required(provider_post_requests).update_provider_conf,methods=['POST'])
 app.add_url_rule('/ui/providers/providerClientDetails', 'providerClientDetails', ui_login_required(provider_get_requests.provider_client_details), methods=['GET'])
 app.add_url_rule('/ui/providers/userProviderDetails', 'userProviderDetails', ui_login_required(provider_get_requests.get_user_provider_details), methods=['GET'])
 
 
 # auth token verifications
-app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', profile.verify_cli_token, methods=['POST'])
+app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', ui_login_required(profile.verify_cli_token), methods=['POST'])
 app.add_url_rule('/ui/profile/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(profile.get_cli_verification_token), methods=['GET'])
 
 
-app.add_url_rule('/providerServer/verifyProviderToken', 'verifyProviderToken', provider_server.verify_provider_token, methods=['POST'])
-app.add_url_rule('/providerServer/getConfig', 'getConfig', provider_server.get_config, methods=['POST'])
+app.add_url_rule('/providerServer/verifyProviderToken', 'verifyProviderToken', ui_login_required(provider_server.verify_provider_token), methods=['POST'])
+app.add_url_rule('/providerServer/getConfig', 'getConfig', ui_login_required(provider_server.get_config), methods=['POST'])
 
 
 # profile routes

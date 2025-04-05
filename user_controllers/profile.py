@@ -51,21 +51,25 @@ def get_user_details(user):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-def update_user_details():
+def update_user_details(user):
     """
     This function is responsible for updating the user details.
     """
     try:
         data = request.json
-        user_id = data.get("user_id")
+        user_id = user.get("user_id")
         if not user_id:
             return jsonify({"error": "User ID is required"}), 400
 
         # Validate input data
-        validated_data = user_schema.load(data)  # Validate input
+        # validated_data = user_schema.load(data)  # Validate input
+        profile_name=data.get("profile_name")
+        profile_image=data.get("profile_image")
+        
 
         # Update the user details in the database
-        result = users_collection.update_one({"user_id": user_id}, {"$set": validated_data})
+        result = users_collection.update_one({"user_id": user_id}, {"$set": {"profile_name": profile_name, "profile_image": profile_image}}
+)
 
         if result.modified_count == 0:
             return jsonify({"error": "No changes made or user not found"}), 404

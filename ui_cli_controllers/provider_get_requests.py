@@ -21,7 +21,7 @@ def providers(subpath):
 def providers_lists(request):
     try:
         providers = provider_details_collection.find(
-            { "provider_status": "Active" },
+            { "provider_status": "active" },
             {
                 "_id": 0,  # Exclude MongoDB _id field
                 "provider_id": 1,
@@ -55,6 +55,8 @@ def providers_lists(request):
 
         # if providers_list:
             # print(providers_list[0]["provider_updated_at"])  # Fixed key access
+        
+        # print(providers_list)
 
         return jsonify({"all_providers": providers_list}), 200
     except Exception as e:
@@ -100,7 +102,7 @@ def get_user_provider_details(user):
                 # Merging provider and configuration details
                 provider.update(provider_conf)
                 # Removing the provider_id from the configuration details
-                provider.pop("provider_id", None)
+                # provider.pop("provider_id", None)
 
         return jsonify({"all_providers": providers_list}), 200
     except Exception as e:
@@ -246,7 +248,7 @@ def providers_query(request):
             return jsonify({"error": "Provider configuration not found"}), 404
         
         # check whether the provider is active or not
-        if providers_details["provider_status"]!="Active":
+        if providers_details["provider_status"]!="active":
             return jsonify({"error": "Provider is not active"}), 404
         
         # check if the queried specs are less than the difference of the used and allowed specs
