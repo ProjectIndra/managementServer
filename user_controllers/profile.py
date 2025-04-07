@@ -145,7 +145,7 @@ def verify_cli_token():
 
         cli_id = str(uuid.uuid4())
         session_token = str(uuid.uuid4())
-        session_expiry_time = (datetime.utcnow() + timedelta(days=30)).isoformat()
+        session_expiry_time = (datetime.utcnow() + timedelta(days=365)).isoformat()
 
 
         session_data = {

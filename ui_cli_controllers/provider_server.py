@@ -51,9 +51,9 @@ def verify_provider_token():
             return jsonify({"error": "Invalid User"}), 404
 
         # Check if the token has expired
-        expiry_time = decoded_token.get("exp")
-        if not expiry_time or datetime.utcnow() > datetime.utcfromtimestamp(expiry_time):
-            return jsonify({"error": "Token expired"}), 401
+        # expiry_time = decoded_token.get("exp")
+        # if not expiry_time or datetime.utcnow() > datetime.utcfromtimestamp(expiry_time):
+        #     return jsonify({"error": "Token expired"}), 401
         
         # check if the provider already exists in the database through provider_id
         provider = provider_details_collection.find_one({"provider_id": provider_id})

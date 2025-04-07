@@ -22,7 +22,7 @@ def launchVm(user):
             if response[0].get_json().get('can_create',False)==False:
                 return jsonify({"error": "Cannot create VM with the given specs"}), 500
         
-        print(user)
+        # print(user)
         client_user_id=user.get('user_id')
         # create the vm with the given specs
         response=helper.helper_vm_creation(request,client_user_id)
@@ -33,7 +33,8 @@ def launchVm(user):
         if response[1]==200:
             return response[0], 200
         else:
-            return jsonify({"error": "Failed to create the VM"}), 500
+            print(response[0].get_json())
+            return jsonify(response[0].get_json()), 500
     except Exception as e:
         print(e)
         return jsonify({"error": "Failed to create the VM"}), 500

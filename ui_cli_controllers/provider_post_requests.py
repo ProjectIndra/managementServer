@@ -96,7 +96,6 @@ def update_provider_conf():
             },
             upsert=True,
         )
-
         
         return jsonify({"message": "Provider configuration updated successfully"}), 200
 

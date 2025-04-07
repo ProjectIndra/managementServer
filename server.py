@@ -39,7 +39,7 @@ app.add_url_rule('/login', 'login', auth.login, methods=['POST'])
 # wg routes
 app.add_url_rule('/ui/wg/connect','connect-wg',ui_login_required(wg.connect_wg),methods=['POST'])
 
-                                        # CLI and CLI common routes
+                                        # CLI and UI common routes
 # vms routes
 app.add_url_rule('/vms/<path:subpath>','cli_vms',ui_login_required(vms_get_request.vmStatus),methods=['GET'])
 app.add_url_rule('/vms/launch','cli_launch_vm',ui_login_required(vms_post_request.launchVm),methods=['POST'])

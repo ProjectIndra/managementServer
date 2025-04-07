@@ -99,81 +99,107 @@ def helper_vm_creation(request,client_user_id):
     """
     try:
         data = request.get_json()
-
-        print(data)
-        # provider_url = 'https://pet-muskox-honestly.ngrok-free.app'
-        vm_name= data.get('vm_name')
         vcpus = data.get('vcpus', 2)
         ram = data.get('ram', 2048)
         storage = data.get('storage', 20)
         provider_user_id = data.get('provider_user_id')
-        # client_user_id = user.get('user_id')
-        # provider_name= data.get('provider_name')
-        vm_image_type = data.get('vm_image', 'ubuntu')
+        # client_user_id = data.get('client_id')
+        provider_name = data.get('provider_name')
+        vm_image_type = data.get('vm_image_type', 'ubuntu')
+        provider_id = data.get('provider_id')
+        vm_name = data.get('vm_name', f"vm-{str(uuid.uuid4())}")
+        internal_vm_name = f"{str(uuid.uuid4())}"
 
-        provider_id=data.get('provider_id')
+        # check if at least one of the parameters out of vcpu , ram and storage is provided or not
+        if not (vcpus or ram or storage):
+            return jsonify({"error": "At least one of vcpu, ram or storage is required"}), 400
+        if not provider_id:
+            return jsonify({"error": "Provider Selection is required"}), 400
+        # check if the vm_name already exists for the user, an user can't create multiple vms with the same name
+        existing_vm = vm_details_collection.find_one({"vm_name": vm_name, "client_user_id": client_user_id})
+        if existing_vm:
+            return jsonify({"error": "VM name already exists , You need to have unique vm name "}), 400
+        
 
-        # print(client_user_id)
         # fetching provider url from the DB using provider_id
-        provider_response=provider_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
-        print(provider_response)
+        provider_response = provider_details_collection.find_one(
+            {"provider_id": provider_id},
+            {"_id": 0, "provider_url": 1, "management_server_verification_token": 1,"provider_status": 1}
+        )
 
         if not provider_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_response.get('provider_url')
-        print(provider_url)
-        management_server_verification_token=provider_response.get('management_server_verification_token')
         
+        # check whether the provider is active or not
+        if provider_response["provider_status"]!="active":
+            return jsonify({"error": "Provider is not active"}), 404
+
+        provider_url = provider_response.get('provider_url')
+        management_server_verification_token = provider_response.get('management_server_verification_token')
+
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
-        
 
         network_list = get_network_list(provider_url, management_server_verification_token)
 
+
+        if not isinstance(network_list, dict) or 'active_networks' not in network_list:
+            return jsonify({"error": "Failed to fetch network list from provider", "details": network_list}), 400
         if "default" not in network_list.get('active_networks', []) and "default" not in network_list.get('inactive_networks', []):
             create_default_network(provider_url, management_server_verification_token)
         elif "default" in network_list.get('inactive_networks', []):
             activate_default_network(provider_url, management_server_verification_token)
-        
+
         vm_data = {
-            "name": vm_name,
+            "name": internal_vm_name,
             "vcpus": vcpus,
             "memory": ram,
             "storage": storage,
             "image": vm_image_type,
-            "qvm_path": "./images/avinash.qcow2",
+            "qvm_path": "/var/lib/libvirt/images/avinash.qcow2",
         }
-        
+
         vm_response = create_vm(provider_url, vm_data, management_server_verification_token)
         vm_response_json = vm_response.json()
+        if vm_response.status_code != 200:
+            return jsonify({"error": "Failed to create VM", "details": vm_response_json}), 500
 
-        print(vm_response_json)
+        # wireguard_response = wg.setup_wireguard(provider_url, data,internal_vm_name,management_server_verification_token)
+        # # if wireguard_response.status_code != 200:
+        # #     return jsonify({"error": "Failed to setup wireguard", "details": wireguard_response[0].json}), 500
+        # print(internal_vm_name)
+        # print("here")
+        # print(wireguard_response.status_code)
+        # print(wireguard_response.json())
+
+        # if wireguard_response.status_code != 200:
+        #     return jsonify({"error": "Failed to setup wireguard", "details": wireguard_response[0].json}), 500
         
-        wireguard_response = wg.setup_wireguard(
-            provider_url, data,management_server_verification_token
-        )
+        # wireguard_response_json = wireguard_response.json()
+        
 
-        vm_id=str(uuid.uuid4())
+        # wireguard_response_json = wireguard_response[0].json
+
+        vm_id = str(uuid.uuid4())
+        
         # inserting vm details in the db
         vm_details = {
             "provider_user_id": provider_user_id,
             "client_user_id": client_user_id,
-            # generating uuid for vm_id
-            "vm_id":vm_id,
+            "vm_id": vm_id,
             "vm_name": vm_name,
-            # generating unique string as like uuid for internal_vm_name
-            "internal_vm_name": f"{vm_name}-{str(uuid.uuid4())}",
+            "internal_vm_name": internal_vm_name,
+            "vm_image_type": vm_image_type,
             "provider_id": provider_id,
+            "provider_name": provider_name,
             "ram": ram,
             "vcpu": vcpus,
             "storage": storage,
-            "vm_image_type":vm_image_type,
-            "vm_creation_time": str(datetime.now()),
-            "wireguard_ip": wireguard_response.get('ip'),
-            "wireguard_public_key": wireguard_response.get('public_key'),
-            "wireguard_status": True,
+            "vm_image_type": vm_image_type,
+            "vm_creation_time": str(datetime.now())
         }
         vm_details_collection.insert_one(vm_details)
+
         # inserting vm status in the db
         vm_status = {
             "vm_id": vm_id,
@@ -185,11 +211,10 @@ def helper_vm_creation(request,client_user_id):
         }
         vm_status_collection.insert_one(vm_status)
 
-
         return jsonify({
-            "message": "Congrats, VM is successfully created",
-            "vm_public_key": wireguard_response.get('public_key')
+            "message": "Congrats, VM is successfully created"
         }), 200
+
     except requests.RequestException as e:
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
 
@@ -203,6 +228,7 @@ def get_network_list(provider_url, management_server_verification_token):
     }
     response = requests.get(f"{provider_url}/network/list", headers=headers)
     return response.json()
+
 
 def create_default_network(provider_url, management_server_verification_token):
     """
@@ -221,7 +247,10 @@ def create_default_network(provider_url, management_server_verification_token):
         "ipRangeEnd": "192.168.122.200",
         "netMask": "255.255.255.0"
     }
-    return requests.post(f"{provider_url}/network/create", json=network_data, headers=headers)
+
+    response = requests.post(f"{provider_url}/network/create", json=network_data, headers=headers)
+    return response.json()
+
 
 def activate_default_network(provider_url, management_server_verification_token):
     """
@@ -230,7 +259,10 @@ def activate_default_network(provider_url, management_server_verification_token)
     headers = {
         'authorization': management_server_verification_token
     }
-    return requests.post(f"{provider_url}/network/activate", json={"name": "default"}, headers=headers)
+
+    response = requests.post(f"{provider_url}/network/activate", json={"name": "default"}, headers=headers)
+    return response.json()
+
 
 def create_vm(provider_url, vm_data, management_server_verification_token):
     """
@@ -241,7 +273,7 @@ def create_vm(provider_url, vm_data, management_server_verification_token):
     }
     return requests.post(f"{provider_url}/vm/create_qvm", json=vm_data, headers=headers)
 
-def helper_activate_vm(provider_id, vm_id):
+def helper_activate_vm(provider_id, vm_id,user_id):
     """
     helper function to activate existing inactive VM 
     params-vm_name,provider_id
@@ -250,19 +282,18 @@ def helper_activate_vm(provider_id, vm_id):
     try:
 
         # fetching provider url from the DB using provider_id
-        provider_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
-        if not provider_response:
+        provider_url_response=provider_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
+        # print(provider_url_response)
+        if not provider_url_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_response.get('provider_url')
+        provider_url=provider_url_response.get('provider_url')
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
-        management_server_verification_token=provider_response.get('management_server_verification_token')
-        
-
-        
+        management_server_verification_token=provider_url_response.get('management_server_verification_token')
+        # print("here")
         # fetching vm_name from the db using vm_id
-        internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id},{"_id":0,"internal_vm_name":1})
+        internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id,"client_user_id":user_id},{"_id":0,"internal_vm_name":1})
         if not internal_vm_name_response:
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
@@ -278,15 +309,16 @@ def helper_activate_vm(provider_id, vm_id):
             {"vm_id": vm_id},
             {"$set": {"status": "active"}}
         )
+        # print(activate_vm_response)
 
-        return activate_vm_response.content, activate_vm_response.status_code, activate_vm_response.headers.items()
+        return activate_vm_response
     
     except requests.RequestException as e:
         print(f"Proxy error: {e}")  # Debugging log
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
 
 
-def helper_deactivate_vm(provider_id, vm_id):
+def helper_deactivate_vm(provider_id, vm_id,user_id):
      # fetching provider url from the DB using provider_id
 
     # provider_url="https://pet-muskox-honestly.ngrok-free.app"
@@ -294,17 +326,18 @@ def helper_deactivate_vm(provider_id, vm_id):
     try:
 
         # fetching provider url from the DB using provider_id
-        provider_url_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
+        provider_url_response=provider_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
+        
         if not provider_url_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_url.get('provider_url')
+        provider_url=provider_url_response.get('provider_url')
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
         management_server_verification_token=provider_url_response.get('management_server_verification_token')
         
         # fetching vm_name from the db using vm_id
-        internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id},{"_id":0,"internal_vm_name":1})
+        internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id,"client_user_id":user_id},{"_id":0,"internal_vm_name":1})
         if not internal_vm_name_response:
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
@@ -328,7 +361,7 @@ def helper_deactivate_vm(provider_id, vm_id):
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
   
 
-def helper_delete_vm(provider_id,vm_id):
+def helper_delete_vm(provider_id,vm_id,user_id):
     """
     helper function to delete inactivated vms
     """
@@ -339,17 +372,18 @@ def helper_delete_vm(provider_id,vm_id):
     try:
 
         # fetching provider url from the DB using provider_id
-        provider_response=vm_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1})
-        if not provider_response:
+        provider_url_response=provider_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
+        # print(provider_url_response)
+        if not provider_url_response:
             return jsonify({"error": "Provider not found"}), 404
-        provider_url=provider_response.get('provider_url')
+        provider_url=provider_url_response.get('provider_url')
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
-        management_server_verification_token=provider_response.get('management_server_verification_token')
-        
+        management_server_verification_token=provider_url_response.get('management_server_verification_token')
+        # print("here")
         # fetching vm_name from the db using vm_id
-        internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id},{"_id":0,"internal_vm_name":1})
+        internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id,"client_user_id":user_id},{"_id":0,"internal_vm_name":1})
         if not internal_vm_name_response:
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
@@ -361,11 +395,13 @@ def helper_delete_vm(provider_id,vm_id):
         delete_vm_response=requests.post(f"{provider_url}/vm/delete",json={"name":internal_vm_name},headers=headers)
         # print(delete_vm_response)
         # update status in the db
+        if delete_vm_response.status_code != 200:
+            return jsonify({"error": "Failed to delete VM", "details": delete_vm_response.json()}), 500
         vm_status_collection.update_one(
             {"vm_id": vm_id},
             {"$set": {"status": "deleted"}}
         )
-        return delete_vm_response.content, delete_vm_response.status_code, delete_vm_response.headers.items()
+        return delete_vm_response.content, delete_vm_response.status_code
     
     except requests.RequestException as e:
         print(f"Proxy error: {e}")  # Debugging log

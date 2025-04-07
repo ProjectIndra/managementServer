@@ -17,7 +17,7 @@ class cliSessionSchema(Schema):
     cli_id = fields.String(required=True)  # Identify different clis
     cli_session_token = fields.String()
     cli_session_token_expiry_timestamp = fields.DateTime()
-    cli_wireguard_ip = fields.String(required=True)
+    cli_wireguard_endpoint = fields.String(required=True)
     cli_wireguard_public_key = fields.String(required=True)
     cli_status = fields.Boolean(default=True)  # Active by default
 
