@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
+import os
+from dotenv import load_dotenv
 
 # internal imports
 import dbConnection  # Import database setup
@@ -14,6 +16,7 @@ app = Flask(__name__)
 CORS(app,supports_credentials=True)  # Enable CORS
 bcrypt = Bcrypt(app)  # Initialize Bcrypt with app
 
+load_dotenv()
 
 dbConnection.setupConnection()
 
@@ -73,10 +76,13 @@ app.add_url_rule('/ui/profile/updateUserDetails', 'updateUserDetails', ui_login_
 # app.add_url_rule('/ui/vm/deactivate','deactivating-active-vm',vm_crud.deactivate_vm,methods=['POST'])
 # app.add_url_rule('/ui/vm/delete','deleting-inactive-vm',vm_crud.delete_vm,methods=['POST'])
 
+# getting port form env
 
 if __name__ == '__main__':
     try:
-        app.run(debug=True,port=5000)
+        port = int(os.getenv("PORT") or 5000)
+        print(f"Starting server on port {port}...")
+        app.run(debug=True, port=port, host='0.0.0.0')
     except Exception as e:
         print(f"Error: {str(e)}")
 
