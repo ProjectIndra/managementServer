@@ -27,7 +27,7 @@ def launchVm(user):
         # create the vm with the given specs
         response=helper.helper_vm_creation(request,client_user_id)
 
-        print("launch-vm")
+        # print("launch-vm")
         # if True:
         #     return jsonify({"message": "VM is successfully created"}), 200
         if response[1]==200:

@@ -91,17 +91,16 @@ def vmStatus_allVms(user_id):
         # Step 2: For each VM, get its status from vm_status_collection
         for vm in vm_details_list:
             status_info = vm_status_collection.find_one(
-                {"vm_id": vm["vm_id"]},
-                {"_id": 0, "status": 1, "vm_deleted": 1, "vm_deleted_at": 1}
-            )
+            {"vm_id": vm["vm_id"]},
+            {"_id": 0, "status": 1, "vm_deleted": 1, "vm_deleted_at": 1}
+    )
 
             if status_info:
-                vm.update(status_info)
+                if status_info.get("status") in ["active", "inactive"]:
+                    vm.update(status_info)
+                    all_vms.append(vm)
             else:
-                # If status not found, optionally set to unknown
-                vm.update({"status": "unknown", "vm_deleted": False, "vm_deleted_at": None})
-
-            all_vms.append(vm)
+                pass
 
         return {"all_vms": all_vms}, 200
     except Exception as e:

@@ -11,6 +11,7 @@ from provider_controllers import telemetry, vm_crud
 from ui_cli_controllers import provider_get_requests, provider_post_requests, vms_get_request ,vms_post_request ,wg,provider_server
 from middlewares.auth_middleware import ui_login_required
 from prometheus_controller import prometheus
+from ui_cli_controllers import hdfs
 
 app = Flask(__name__)
 CORS(app,supports_credentials=True)  # Enable CORS
@@ -68,7 +69,12 @@ app.add_url_rule('/providerServer/getConfig', 'getConfig', provider_server.get_c
 app.add_url_rule('/ui/profile/getUserDetails', 'getUserDetails', ui_login_required(profile.get_user_details), methods=['GET'])
 app.add_url_rule('/ui/profile/updateUserDetails', 'updateUserDetails', ui_login_required(profile.update_user_details), methods=['POST'])
 
-
+# hdfs routes
+app.add_url_rule('/hdfs/uploadFile', 'upload_file_folder', ui_login_required(hdfs.upload_file), methods=['POST'])
+app.add_url_rule('/hdfs/list', 'list_file_folder', ui_login_required(hdfs.list_files_folders), methods=['GET'])
+app.add_url_rule('/hdfs/mkdir', 'create_directory', ui_login_required(hdfs.make_directory), methods=['POST'])
+app.add_url_rule('/hdfs/delete', 'delete_file_folder', ui_login_required(hdfs.delete), methods=['POST'])
+# app.add_url_rule('/hdfs/download', 'download_file', ui_login_required(hdfs.download_file), methods=['GET'])
 
 # vm operations (provider)
 # app.add_url_rule('/ui/requestvm','requesting-vm-creation',vm_crud.vm_creation,methods=['POST'])

@@ -399,7 +399,7 @@ def helper_delete_vm(provider_id,vm_id,user_id):
             return jsonify({"error": "Failed to delete VM", "details": delete_vm_response.json()}), 500
         vm_status_collection.update_one(
             {"vm_id": vm_id},
-            {"$set": {"status": "deleted"}}
+            {"$set": {"status": "deleted", "vm_deleted": True, "vm_deleted_at": str(datetime.now())}}
         )
         return delete_vm_response.content, delete_vm_response.status_code
     
