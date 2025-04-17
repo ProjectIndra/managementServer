@@ -12,45 +12,27 @@ def file_path_translation(original_path,username):
     """
     # prepend the username to the path
     new_path = f"""{username}/{original_path}"""
-    # print("new_path",new_path)
     return new_path
 
 
-def upload_file(user):
+def upload_file_folder(user):
     try:
-        # data= request.get_json()
-        # if not data:
-        #     return jsonify({"error": "No data provided"}), 400
-        # # Validate the request data
-        # errors = hdfs_schema.validate(data)
 
-        # if errors:
-        #     return jsonify({"error": errors}), 400
-        
-        # # Extract the file and path from the request
-        # file = request.files.get('file')
-        # if not file:
-        #     return jsonify({'error': 'No file part in the request'}), 400
-        # if file.filename == '':
-        #     return jsonify({'error': 'No selected file'}), 400
-        
-        # path = request.form.get('path')
-        # if not path:
-        #     return jsonify({'error': 'Missing path'}), 400
+        type = request.form.get("type")
 
-        # print(request)
-        print(request.files)
+        if not type:
+            return jsonify({"error": "Missing type"}), 400
+        if type not in ["file", "folder"]:
+            return jsonify({"error": "Invalid type. Must be 'file' or 'folder'"}), 400
 
         if 'file' not in request.files:
             return jsonify({'error': 'No file part in the request'}), 400
 
-        file = request.files['file']
+        file = request.files.get('file')
         if file.filename == '':
             return jsonify({'error': 'No selected file'}), 400
 
         path = request.form.get('path')
-        if not path:
-            return jsonify({'error': 'Missing path'}), 400
         
 
         user_id = user.get('user_id')
@@ -66,10 +48,21 @@ def upload_file(user):
 
         # Send the file to the actual HDFS server
         files = {'file': (file.filename, file.stream, file.mimetype)}
-        res = requests.post(f"{HDFS_SERVER}/upload", files=files, data={"path": new_path})
 
-        if res.status_code != 200:
-            return jsonify({"error": "File upload to HDFS failed"}), res.status_code
+        if type == "file":
+            res = requests.post(f"{HDFS_SERVER}/upload", files=files, data={"path": new_path})
+            if res.status_code != 200:
+                return jsonify({"message": "File upload to HDFS failed","error":res.json().get("error")}), res.status_code
+        
+        elif type == "folder":
+            res = requests.post(f"{HDFS_SERVER}/uploadFolder", files=files, data={"path": new_path})
+            if res.status_code != 200:
+                return jsonify({"error": "Folder creation in HDFS failed","error":res.json().get("error")}), res.status_code
+            # No need to upload files for folders, just create the folder
+            return jsonify({"message": "Folder created successfully"}), 200
+        else:
+            return jsonify({"error": "Invalid type. Must be 'file' or 'folder'"}), 400
+
 
         hdfs_details = {
             "name": file.filename,
@@ -88,7 +81,7 @@ def upload_file(user):
 
         hdfs_collection.insert_one(hdfs_details)
 
-        return jsonify({"message": "File uploaded successfully", "hdfs_details": hdfs_details}), 200
+        return jsonify({"message": "File uploaded successfully"}), 200
 
     except Exception as e:
         print(e)
@@ -116,6 +109,25 @@ def list_files_folders(user):
 
         res = requests.post(f"{HDFS_SERVER}/list", json={"path": new_path})
         if res.status_code != 200:
+            if res.status_code == 400:
+                print("path",path)
+                if path == "":
+                    res = requests.post(f"{HDFS_SERVER}/mkdir", json={"path": username})
+                    hdfs_details = {
+                    "name": username,
+                    "path": username,
+                    "type": "DIRECTORY",
+                    "description": "",
+                    "permission": "",
+                    "user_id": user_id,
+                    "size": "-",
+                    "createdAt": dateTime.now(),
+                    "lastModified": dateTime.now()
+                }
+        
+                hdfs_collection.insert_one(hdfs_details)
+                return jsonify({"message":"Files and folders doesn't exists. Upload files or create folders.","contents":[]}), 200
+            
             return jsonify({"message": "Failed to list contents from HDFS","error":res.json()}), res.status_code
         contents = res.json().get("contents", [])
         # removing the first element i.e. usename which was prepended from file_path_translation
@@ -128,6 +140,45 @@ def list_files_folders(user):
     except Exception as e:
         print(e)
         return jsonify({"error": "Failed to list contents"}), 500
+
+def rename_file_folder(user):
+    """
+    Rename a file or folder in HDFS.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        old_path = data.get("old_path")
+        new_name = data.get("new_name")
+        user_id = user.get("user_id")
+        username = user.get("username")
+        if not old_path or not new_name or not user_id:
+            return jsonify({"error": "Missing required parameters"}), 400
+        load_dotenv()
+        HDFS_SERVER = os.getenv("HDFS_SERVER")
+        old_path = file_path_translation(old_path, username)
+        new_path = "/".join(old_path.split("/")[:-1] + [new_name])
+
+        print("old_path",old_path)
+        print("new_path",new_path)
+
+        res = requests.post(f"{HDFS_SERVER}/rename", json={"old_path": old_path, "new_path": new_path})
+        if res.status_code != 200:
+            print("res",res.json())
+            return jsonify({"error": "Failed to rename file/folder in HDFS"}), res.status_code
+        # Update the database with the new name
+        hdfs_collection.update_one(
+            {"path": old_path, "user_id": user_id},
+            {"$set": {"path": new_path, "name": new_name}},
+            upsert=False
+        )
+        return jsonify({"message": "File/Folder renamed successfully", "new_path": new_path}), 200
+    
+    except Exception as e:
+        print(e)
+        return jsonify({"error": "Failed to rename file/folder"}), 500
     
 def make_directory(user):
     try:
