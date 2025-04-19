@@ -69,7 +69,7 @@ def update_user_details(user):
 
         # Update the user details in the database
         result = users_collection.update_one({"user_id": user_id}, {"$set": {"profile_name": profile_name, "profile_image": profile_image}}
-)
+        )
 
         if result.modified_count == 0:
             return jsonify({"error": "No changes made or user not found"}), 404
@@ -83,22 +83,18 @@ def update_user_details(user):
 
 def get_cli_verification_token(user):
     try:
-        # authorization = request.headers.get("Authorization")
-        # token = authorization.split(" ")[1]
-        # if not token:
-        #     return jsonify({"error": "Token from cookie is required"}), 400
-
-        # decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        # user_id = decoded_token.get("user_id")
         user_id=user.get("user_id")
         
         user = users_collection.find_one({"user_id": user_id})
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        cli_verification_token= user.get("cli_verification_token")
-        if not cli_verification_token:
-            return jsonify({"error": "Token not found"}), 404
+        cli_verification_token=str(uuid.uuid4())
+        #update the cli_verification_token in the db
+        users_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"cli_verification_token": cli_verification_token, "cli_verification_token_expiry_timestamp": datetime.utcnow() + timedelta(days=1)}}
+        )
 
         return jsonify({"cli_verification_token": cli_verification_token}), 200
     
@@ -116,7 +112,6 @@ def verify_cli_token():
         token = data.get("cli_verification_token")
         wireguard_endpoint = data.get("wireguard_endpoint")
         wireguard_public_key = data.get("wireguard_public_key")
-        old_cli_id = data.get("old_cli_id")
 
         if not wireguard_endpoint or not wireguard_public_key:
             return jsonify({"error": "WireGuard IP and Public Key are required"}), 400
@@ -125,61 +120,42 @@ def verify_cli_token():
         if not token:
             return jsonify({"error": "Verification token is required"}), 400
         
-        # if the cli is already verified then on requesting the token again, the previous cli will be invalidated/inactive
 
-        if old_cli_id!="":
-            # update the cli status to inactive and first check if the old_cli_id is present in the db or not
-            old_cli = cli_session_collection.find_one({"cli_id": old_cli_id})
-            if not old_cli:
-                return jsonify({"error": "Old CLI ID not found"}), 404
-            # update the cli status to inactive
+        # update the cli status to inactive and first check if the old_cli_id is present in the db or not
+        old_cli = cli_session_collection.find_one({"cli_verification_token": token})
+        if old_cli:
+            #deactivate the old cli
+            old_cli_id = old_cli.get("cli_id")
             cli_session_collection.update_one(
-                {"cli_id": old_cli_id},
+                {"cli_id":old_cli_id,"cli_verification_token": token},
                 {"$set": {"cli_status": False}}
             )   
 
-
-        decrypted_user_id = cipher.decrypt(token.encode()).decode()
-
-        user = users_collection.find_one({"user_id": decrypted_user_id})
+        # check if the new cli verification token is present in the db or not
+        user = users_collection.find_one({"cli_verification_token": token},{"_id": 0, "user_id": 1})
         if not user:
             return jsonify({"error": "Invalid token"}), 401
-
-        # expiry_time = user.get("cli_verification_token_expiry_timestamp")
-        # if not expiry_time or datetime.utcnow() > expiry_time:
-        #     return jsonify({"error": "Token expired"}), 401
+        user_id=user.get("user_id")
 
         cli_id = str(uuid.uuid4())
         session_token = str(uuid.uuid4())
         session_expiry_time = (datetime.utcnow() + timedelta(days=365)).isoformat()
 
-
         session_data = {
-            "user_id": decrypted_user_id,
+            "user_id": user_id,
             "cli_id": cli_id,
             "cli_wireguard_endpoint": wireguard_endpoint,
             "cli_wireguard_public_key": wireguard_public_key,
             "cli_status": True,
             "cli_session_token": session_token,
-            "cli_session_token_expiry_timestamp": session_expiry_time
+            "cli_session_token_expiry_timestamp": session_expiry_time,
+            "cli_verification_token": token
         }
         cli_session_schema.load(session_data)  # Validate session data
-
-# whenever any CLI is verified through the token , then the browser token/cli_verification_token will be updatedd
         cli_session_collection.insert_one(session_data)
-        encrypted_token = cipher.encrypt(decrypted_user_id.encode()).decode()
-
-        users_collection.update_one(
-            {"user_id": decrypted_user_id},
-            {"$set": {
-                "cli_verification_token": encrypted_token
-            }}
-        )
 
         return jsonify({
             "message": "Token verified successfully",
-            "user_id": decrypted_user_id,
-            "cli_id": cli_id,
             "session_token": session_token
         }), 200
     
@@ -191,4 +167,3 @@ def verify_cli_token():
         return jsonify({"error": "Invalid token"}), 401
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-

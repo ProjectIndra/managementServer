@@ -139,6 +139,7 @@ def verify_provider_token():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 def get_config():
     """
     This function is responsible for getting the server configuration.

@@ -25,12 +25,15 @@ dbConnection.setupConnection()
 def home():
     return "Hello, Welcome to the management server",200
 
+# Prometheus metrics route
 app.add_url_rule('/prometheus/query/<path:subpath>', 'metrics', prometheus.query_prometheus, methods=["GET"])
+app.add_url_rule('/prometheus/update_config', 'update_config', prometheus.update_prometheus_conf, methods=["POST"])
 
 
 
 # provider server telemetry routes 
 app.add_url_rule('/heartbeat','provider-heartbeat',telemetry.heartbeat,methods=['POST'])
+
 
 # vm telemetry
 app.add_url_rule('/ui/<provider_id>/<path:subpath>', 'dynamic_proxy', telemetry.vm_telemetry, methods=['GET', 'POST', 'PUT', 'DELETE'])
