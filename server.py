@@ -70,7 +70,7 @@ app.add_url_rule('/ui/profile/getUserDetails', 'getUserDetails', ui_login_requir
 app.add_url_rule('/ui/profile/updateUserDetails', 'updateUserDetails', ui_login_required(profile.update_user_details), methods=['POST'])
 
 # hdfs routes
-app.add_url_rule('/hdfs/uploadFile', 'upload_file_folder', ui_login_required(hdfs.upload_file_folder), methods=['POST'])
+app.add_url_rule('/hdfs/uploadFileFolder', 'upload_file_folder', ui_login_required(hdfs.upload_file_folder), methods=['POST'])
 app.add_url_rule('/hdfs/list', 'list_file_folder', ui_login_required(hdfs.list_files_folders), methods=['GET'])
 app.add_url_rule('/hdfs/mkdir', 'create_directory', ui_login_required(hdfs.make_directory), methods=['POST'])
 app.add_url_rule('/hdfs/delete', 'delete_file_folder', ui_login_required(hdfs.delete), methods=['POST'])

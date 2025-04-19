@@ -15,12 +15,13 @@ def launchVm(user):
     try:
         # first query the provider that whether it is possible to create a vm with the given specs
         response=helper.providers_query_helper(request)
+        # print("response",response[0].get_json().get('can_create'))
         if response[1]!=200:
             return response
         if response[1]==200:
             # print(response[0].get_json())
             if response[0].get_json().get('can_create',False)==False:
-                return jsonify({"error": "Cannot create VM with the given specs"}), 500
+                return jsonify({"error": response[1].get_json().get('error',"Cannot create VM with the given specs")}), 500
         
         # print(user)
         client_user_id=user.get('user_id')

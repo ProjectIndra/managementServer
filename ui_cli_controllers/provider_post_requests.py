@@ -111,5 +111,6 @@ def providers_query():
         return helper.providers_query_helper(request)        
     
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
         

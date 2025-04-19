@@ -114,10 +114,11 @@ def verify_cli_token():
     try:
         data = request.json
         token = data.get("cli_verification_token")
-        wireguard_ip = data.get("wireguard_ip")
+        wireguard_endpoint = data.get("wireguard_endpoint")
         wireguard_public_key = data.get("wireguard_public_key")
+        old_cli_id = data.get("old_cli_id")
 
-        if not wireguard_ip or not wireguard_public_key:
+        if not wireguard_endpoint or not wireguard_public_key:
             return jsonify({"error": "WireGuard IP and Public Key are required"}), 400
 
 
@@ -126,12 +127,17 @@ def verify_cli_token():
         
         # if the cli is already verified then on requesting the token again, the previous cli will be invalidated/inactive
 
-        old_cli_id = data.get("old_cli_id")
         if old_cli_id!="":
+            # update the cli status to inactive and first check if the old_cli_id is present in the db or not
+            old_cli = cli_session_collection.find_one({"cli_id": old_cli_id})
+            if not old_cli:
+                return jsonify({"error": "Old CLI ID not found"}), 404
+            # update the cli status to inactive
             cli_session_collection.update_one(
                 {"cli_id": old_cli_id},
                 {"$set": {"cli_status": False}}
-            )
+            )   
+
 
         decrypted_user_id = cipher.decrypt(token.encode()).decode()
 
@@ -151,7 +157,7 @@ def verify_cli_token():
         session_data = {
             "user_id": decrypted_user_id,
             "cli_id": cli_id,
-            "cli_wireguard_ip": wireguard_ip,
+            "cli_wireguard_endpoint": wireguard_endpoint,
             "cli_wireguard_public_key": wireguard_public_key,
             "cli_status": True,
             "cli_session_token": session_token,

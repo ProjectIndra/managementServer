@@ -5,7 +5,8 @@ class VMStatusSchema(Schema):
     vm_id = fields.String(required=True)
     vm_name = fields.String()
     status = fields.String(required=True)
-    provider_id = fields.String()
+    provider_id = fields.String() #id of the provider server not the provider user
+    client_user_id = fields.String(required=True)
     vm_deleted = fields.Boolean(default=False)
     vm_deleted_at = fields.DateTime()
 
@@ -31,6 +32,7 @@ class VMDetailsSchema(Schema):
     wireguard_connection_details = fields.List(fields.Nested(lambda: WireguardConnectionDetailsSchema()))
     internal_vm_name = fields.String() #internal reference
     vm_created_at = fields.DateTime(required=True)
+
 
 
 vm_status_schema = VMStatusSchema()

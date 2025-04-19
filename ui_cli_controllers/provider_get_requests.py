@@ -31,6 +31,7 @@ def providers_lists(request):
                 "provider_rating": 1,
             }
         )
+        print("providers",providers)
 
         providers_list = list(providers)
         # print(providers_list)

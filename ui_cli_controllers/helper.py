@@ -18,7 +18,7 @@ def providers_query_helper(request):
     try:
         data=request.get_json()
 
-        vcpu=data.get('vcpu')
+        vcpus=data.get('vcpus')
         ram=data.get('ram')
         storage=data.get('storage')
         provider_id=data.get('provider_id')
@@ -27,7 +27,7 @@ def providers_query_helper(request):
         # print(data)
 
         # check if at least one of the parameters out of vcpu , ram and storage is provided or not
-        if not (vcpu or ram or storage):
+        if not (vcpus or ram or storage):
             return jsonify({"error": "At least one of vcpu, ram or storage is required"}), 400
         if not provider_id:
             return jsonify({"error": "Provider Selection is required"}), 400
@@ -75,7 +75,7 @@ def providers_query_helper(request):
                             "can_create": False
                             }), 200
     
-        if vcpu and int(vcpu) > (int(provider_conf["provider_allowed_vcpu"]) - int(providers_details["provider_used_vcpu"])):
+        if vcpus and int(vcpus) > (int(provider_conf["provider_allowed_vcpu"]) - int(providers_details["provider_used_vcpu"])):
             return jsonify({"error": "More specs(vcpu) already being used by clients.",
                             "can_create": False
                             }), 200
@@ -88,6 +88,7 @@ def providers_query_helper(request):
         return jsonify({"can_create": True}), 200
     
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
         
 
@@ -102,13 +103,14 @@ def helper_vm_creation(request,client_user_id):
         vcpus = data.get('vcpus', 2)
         ram = data.get('ram', 2048)
         storage = data.get('storage', 20)
-        provider_user_id = data.get('provider_user_id')
+        # provider_user_id = data.get('provider_user_id')
         # client_user_id = data.get('client_id')
-        provider_name = data.get('provider_name')
-        vm_image_type = data.get('vm_image_type', 'ubuntu')
+        # provider_name = data.get('provider_name')
+        vm_image_type = data.get('vm_image', 'ubuntu')
         provider_id = data.get('provider_id')
         vm_name = data.get('vm_name', f"vm-{str(uuid.uuid4())}")
         internal_vm_name = f"{str(uuid.uuid4())}"
+
 
         # check if at least one of the parameters out of vcpu , ram and storage is provided or not
         if not (vcpus or ram or storage):
@@ -124,11 +126,13 @@ def helper_vm_creation(request,client_user_id):
         # fetching provider url from the DB using provider_id
         provider_response = provider_details_collection.find_one(
             {"provider_id": provider_id},
-            {"_id": 0, "provider_url": 1, "management_server_verification_token": 1,"provider_status": 1}
+            {"_id": 0, "provider_url": 1, "management_server_verification_token": 1,"provider_status": 1,"provider_name": 1,"user_id": 1}
         )
 
         if not provider_response:
             return jsonify({"error": "Provider not found"}), 404
+        
+        
         
         # check whether the provider is active or not
         if provider_response["provider_status"]!="active":
@@ -136,6 +140,8 @@ def helper_vm_creation(request,client_user_id):
 
         provider_url = provider_response.get('provider_url')
         management_server_verification_token = provider_response.get('management_server_verification_token')
+        provider_name = provider_response.get('provider_name')
+        provider_user_id = provider_response.get('user_id')
 
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
@@ -216,6 +222,7 @@ def helper_vm_creation(request,client_user_id):
         }), 200
 
     except requests.RequestException as e:
+        print("error",e)
         return jsonify({"error": "Failed to reach provider", "details": str(e)}), 500
 
 
@@ -301,15 +308,7 @@ def helper_activate_vm(provider_id, vm_id,user_id):
         headers = {
             'authorization': management_server_verification_token
         }
-
         activate_vm_response=requests.post(f"{provider_url}/vm/activate",json={"name":internal_vm_name},headers=headers)
-        # print(activate_vm_response)
-        # update status in the db
-        vm_status_collection.update_one(
-            {"vm_id": vm_id},
-            {"$set": {"status": "active"}}
-        )
-        # print(activate_vm_response)
 
         return activate_vm_response
     
@@ -345,14 +344,8 @@ def helper_deactivate_vm(provider_id, vm_id,user_id):
         headers = {
             'authorization': management_server_verification_token
         }
-
         deactivate_vm_response=requests.post(f"{provider_url}/vm/deactivate",json={"name":internal_vm_name},headers=headers)
         # print(deactivate_vm_response)
-        # update in the db
-        vm_status_collection.update_one(
-            {"vm_id": vm_id},
-            {"$set": {"status": "inactive"}}
-        )
 
         return deactivate_vm_response.content, deactivate_vm_response.status_code, deactivate_vm_response.headers.items()
     
