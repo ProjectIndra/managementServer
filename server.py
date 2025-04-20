@@ -10,7 +10,7 @@ from user_controllers import auth, profile  # Import auth routes
 from provider_controllers import telemetry, vm_crud
 from ui_cli_controllers import provider_get_requests, provider_post_requests, vms_get_request ,vms_post_request ,wg,provider_server
 from middlewares.auth_middleware import ui_login_required
-from prometheus_controller import prometheus
+from prometheus_controller import prometheus_dump_data, prometheus_metrics
 from ui_cli_controllers import hdfs
 
 app = Flask(__name__)
@@ -23,16 +23,20 @@ dbConnection.setupConnection()
 
 @app.route('/')
 def home():
+    """
+
+    """
     return "Hello, Welcome to the management server",200
 
 # Prometheus metrics route
-app.add_url_rule('/prometheus/query/<path:subpath>', 'metrics', prometheus.query_prometheus, methods=["GET"])
-app.add_url_rule('/prometheus/update_config', 'update_config', prometheus.update_prometheus_conf, methods=["POST"])
+app.add_url_rule('/prometheus/query/<path:subpath>', 'metrics', prometheus_metrics.query_prometheus, methods=["GET"])
+# app.add_url_rule('/prometheus/update_config', 'update_config', prometheus_conf_file_update.remove_prometheus_target, methods=["POST"]) #this was just for testing
+app.add_url_rule('/prometheus/dumpData', 'dumpData', prometheus_dump_data.dump_data, methods=["GET"])
 
 
 
 # provider server telemetry routes 
-app.add_url_rule('/heartbeat','provider-heartbeat',telemetry.heartbeat,methods=['POST'])
+# app.add_url_rule('/heartbeat','provider-heartbeat',telemetry.heartbeat,methods=['POST'])
 
 
 # vm telemetry

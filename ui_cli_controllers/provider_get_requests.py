@@ -112,7 +112,7 @@ def get_user_provider_details(user):
 
 def provider_client_details(user):
     """
-    This function is responsible for returning the all the providers of a user.
+    This function is responsible for returning the all the clients of a user.
     """
     try:
         user_id= user.get("user_id")
