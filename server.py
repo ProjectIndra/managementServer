@@ -60,7 +60,7 @@ app.add_url_rule('/ui/providers/userProviderDetails', 'userProviderDetails', ui_
 
 
 # auth token verifications
-app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', ui_login_required(profile.verify_cli_token), methods=['POST'])
+app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', profile.verify_cli_token, methods=['POST'])
 app.add_url_rule('/ui/profile/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(profile.get_cli_verification_token), methods=['GET'])
 
 

@@ -93,7 +93,7 @@ def get_cli_verification_token(user):
         #update the cli_verification_token in the db
         users_collection.update_one(
             {"user_id": user_id},
-            {"$set": {"cli_verification_token": cli_verification_token, "cli_verification_token_expiry_timestamp": datetime.utcnow() + timedelta(days=1)}}
+            {"$set": {"cli_verification_token": cli_verification_token}}
         )
 
         return jsonify({"cli_verification_token": cli_verification_token}), 200
