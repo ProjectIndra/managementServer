@@ -212,6 +212,7 @@ def helper_vm_creation(request,client_user_id):
             "vm_name": vm_name,
             "status": "active",
             "provider_id": provider_id,
+            "client_user_id": client_user_id,
             "vm_deleted": False,
             "vm_deleted_at": None
         }
@@ -308,6 +309,15 @@ def helper_activate_vm(provider_id, vm_id,user_id):
         headers = {
             'authorization': management_server_verification_token
         }
+
+        network_list = get_network_list(provider_url, management_server_verification_token)
+
+        if not isinstance(network_list, dict) or 'active_networks' not in network_list:
+            return jsonify({"error": "Failed to fetch network list from provider", "details": network_list}), 400
+       
+        if "default" in network_list.get('inactive_networks', []):
+            activate_default_network(provider_url, management_server_verification_token)
+
         activate_vm_response=requests.post(f"{provider_url}/vm/activate",json={"name":internal_vm_name},headers=headers)
 
         return activate_vm_response
