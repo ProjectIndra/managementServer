@@ -52,8 +52,8 @@ def vmStatus(subpath,user):
 def modifyrequest(req, user_id):
     try:
         vm_name = req.args.get('vm_name')
-        vm_details = vm_details_collection.find_one(
-            {"vm_name": vm_name, "client_user_id": user_id},
+        vm_details = vm_status_collection.find_one(
+            {"vm_name": vm_name, "vm_deleted":False, "client_user_id": user_id},
             {"_id": 0, "vm_id": 1, "provider_id": 1}
         )
         if not vm_details:
@@ -236,8 +236,6 @@ def vmStatus_vm_forceRemove(request,user_id):
     try:
         vm_id = request.args.get('vm_id')
         provider_id = request.args.get('provider_id')
-        print("vm_id",vm_id)
-        print("provider_id",provider_id)
         # fetch provider_id from db using vm_id
         vm_status = vm_status_collection.find_one({"vm_id": vm_id,"client_user_id":user_id}, {"_id": 0, "status": 1,"provider_id":1})
         if not vm_status:
@@ -248,7 +246,7 @@ def vmStatus_vm_forceRemove(request,user_id):
         if response[1] == 200:
             return jsonify({"message": "VM is successfully force deleted"}), 200
         elif response[1] == 404:
-            return jsonify({"error":"Provider where the VM is not reachable.Sorry for the inconvenience"}),500
+            return jsonify({"error":response[0].json.get('error')}),500
         else:
             return jsonify({"error": "Failed to force delete VM"}), 400
     except Exception as e:

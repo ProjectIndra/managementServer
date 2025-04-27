@@ -2,7 +2,7 @@ from dbConnection import db  # Import your DB connection
 from marshmallow import Schema, fields
 
 class providerSchema(Schema):
-    user_id= fields.String(required=True)
+    user_id= fields.String(required=True) #this is the user id of the provider user or we can say provider_user_id
     provider_id = fields.String(required=True)
     provider_name = fields.String(required=True)
     # provider_type = fields.String(required=True,default="ubuntu") #not needed here , only for vm it's needed

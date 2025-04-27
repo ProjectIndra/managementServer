@@ -118,7 +118,7 @@ def helper_vm_creation(request,client_user_id):
         if not provider_id:
             return jsonify({"error": "Provider Selection is required"}), 400
         # check if the vm_name already exists for the user, an user can't create multiple vms with the same name
-        existing_vm = vm_details_collection.find_one({"vm_name": vm_name, "client_user_id": client_user_id})
+        existing_vm = vm_status_collection.find_one({"vm_name": vm_name,"vm_deleted":False, "client_user_id": client_user_id})
         if existing_vm:
             return jsonify({"error": "VM name already exists , You need to have unique vm name "}), 400
         
@@ -384,9 +384,17 @@ def helper_delete_vm(provider_id,vm_id,user_id):
             return jsonify({"error": "Provider URL not found"}), 404
         
         management_server_verification_token=provider_url_response.get('management_server_verification_token')
-        # print("here")
-        # fetching vm_name from the db using vm_id
+
+        # fetching internal_vm_name from the db using vm_id
+        # first check if the vm_id is valid or not then get the internal_vm_name
+        vm_status_response=vm_status_collection.find_one({"vm_id":vm_id,"vm_deleted":False,"client_user_id":user_id},{"_id":0,"vm_id":1})
+
+        valid_vm_id=vm_status_response.get('vm_id')
+        if not valid_vm_id:
+            return jsonify({"error": "VM not found"}), 404
+        
         internal_vm_name_response=vm_details_collection.find_one({"vm_id":vm_id,"client_user_id":user_id},{"_id":0,"internal_vm_name":1})
+        
         if not internal_vm_name_response:
             return jsonify({"error": "VM not found"}), 404
         internal_vm_name=internal_vm_name_response.get('internal_vm_name')
