@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 # internal imports
 import dbConnection  # Import database setup
-from user_controllers import auth, profile  # Import auth routes
+from user_controllers import auth, profile, cli  # Import auth routes
 from provider_controllers import telemetry, vm_crud
 from ui_cli_controllers import provider_get_requests, provider_post_requests, vms_get_request ,vms_post_request ,wg,provider_server
 from middlewares.auth_middleware import ui_login_required
@@ -62,10 +62,13 @@ app.add_url_rule('/ui/providers/update_config','cli_ui_update_provider_config',u
 app.add_url_rule('/ui/providers/providerClientDetails', 'providerClientDetails', ui_login_required(provider_get_requests.provider_client_details), methods=['GET'])
 app.add_url_rule('/ui/providers/userProviderDetails', 'userProviderDetails', ui_login_required(provider_get_requests.get_user_provider_details), methods=['GET'])
 
+# client/cli routes
+app.add_url_rule('/ui/getAllCliSessionDetails', 'getAllCliDetails', ui_login_required(cli.get_all_cli_details), methods=['GET'])
+app.add_url_rule('/ui/deleteCliSession', 'deleteCli', ui_login_required(cli.delete_cli_session), methods=['GET'])
+app.add_url_rule('/ui/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(cli.get_cli_verification_token), methods=['GET'])
 
 # auth token verifications
-app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', profile.verify_cli_token, methods=['POST'])
-app.add_url_rule('/ui/profile/getCliVerificationToken', 'getCliVerificationToken', ui_login_required(profile.get_cli_verification_token), methods=['GET'])
+app.add_url_rule('/cli/profile/verifyCliToken', 'verifyCliToken', cli.verify_cli_token, methods=['POST'])
 
 
 app.add_url_rule('/providerServer/verifyProviderToken', 'verifyProviderToken',provider_server.verify_provider_token, methods=['POST'])
