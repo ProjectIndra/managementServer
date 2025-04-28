@@ -20,10 +20,16 @@ def providers(subpath):
     
 def providers_lists(request):
     try:
+        search_query = request.args.get('provider_name', None)
+
+        query = { "provider_status": "active" }
+        if search_query:
+            query["provider_name"] = { "$regex": f"^{search_query}", "$options": "i" }
+
         providers = provider_details_collection.find(
-            { "provider_status": "active" },
+            query,
             {
-                "_id": 0,  # Exclude MongoDB _id field
+                "_id": 0, 
                 "provider_id": 1,
                 "provider_name": 1,
                 "user_id": 1,
@@ -31,17 +37,14 @@ def providers_lists(request):
                 "provider_rating": 1,
             }
         )
-        print("providers",providers)
 
         providers_list = list(providers)
-        # print(providers_list)
 
-    #    iterate over the providers_list and for each provider_id take out the details of provider_conf collection from the provider_id
         for provider in providers_list:
             provider_conf = provider_conf_collection.find_one(
                 {"provider_id": provider["provider_id"]},
                 {
-                    "_id": 0,  # Exclude MongoDB _id field
+                    "_id": 0,
                     "provider_allowed_ram": 1,
                     "provider_allowed_vcpu": 1,
                     "provider_allowed_storage": 1,
@@ -50,14 +53,7 @@ def providers_lists(request):
                 }
             )
             if provider_conf:
-                # Merging provider and configuration details
                 provider.update(provider_conf)
-
-
-        # if providers_list:
-            # print(providers_list[0]["provider_updated_at"])  # Fixed key access
-        
-        # print(providers_list)
 
         return jsonify({"all_providers": providers_list}), 200
     except Exception as e:
