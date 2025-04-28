@@ -104,9 +104,18 @@ def vmStatus_allVms(user_id):
 
         all_vms = []
 
+        search_query=request.args.get('vm_name', None)
+
+        print("search_query",search_query)
+        query={"client_user_id": user_id}
+        if search_query:
+            query['vm_name'] = { "$regex": f"^{search_query}", "$options": "i" }
+            
+
+
         # Step 1: Get all VMs for the user from vm_details_collection
         vm_details_list = list(vm_details_collection.find(
-            {"client_user_id": user_id},
+            query,
             {
                 "_id": 0,
                 "vm_id": 1,
@@ -135,6 +144,8 @@ def vmStatus_allVms(user_id):
                     all_vms.append(vm)
             else:
                 pass
+        
+        print("all_vms",all_vms)
 
         return {"all_vms": all_vms}, 200
     except Exception as e:
