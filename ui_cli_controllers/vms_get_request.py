@@ -17,7 +17,7 @@ def vmStatus(subpath,user):
     try:
         user_id = user.get('user_id')
         if subpath == "allActiveVms":
-            return vmStatus_allActiveVms()
+            return vmStatus_allActiveVms(user_id)
         elif subpath == "allVms":
             return vmStatus_allVms(user_id)
         elif subpath == "start":
@@ -69,25 +69,41 @@ def modifyrequest(req, user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-def vmStatus_allActiveVms():
+def vmStatus_allActiveVms(user_id):
     """
-    This function is responsible
-    for returning the lists of all the active vms along with their wireguard connection status.
+    Fetch and return the list of all active VMs for a specific user along with their WireGuard connection status.
     """
     try:
-
-        active_vms_ids= list(vm_status_collection.find({"status": "active"}, {"_id": 0, "vm_id": 1}))
-        # print("active_vms_ids",active_vms_ids)
+        print(user_id)
         active_vms = []
-        for vm in active_vms_ids:
-            vm_details = vm_details_collection.find_one(
-                {"vm_id": vm["vm_id"]},
-                {"_id": 0, "provider_id":1, "provider_name":1, "wireguard_ip":1, "wireguard_public_key":1, "wireguard_status":1,"vm_name":1}
+
+        query = {
+            "client_user_id": user_id
+        }
+
+        vm_details_list = list(vm_details_collection.find(
+            query,
+            {
+                "_id": 0,
+                "vm_id": 1,
+                "vm_name": 1,
+                "provider_id": 1,
+                "provider_name": 1,
+                "wireguard_ip": 1,
+                "wireguard_public_key": 1,
+                "wireguard_status": 1
+            }
+        ))
+
+        for vm in vm_details_list:
+            status_info = vm_status_collection.find_one(
+                {"vm_id": vm["vm_id"], "status": "active"},
+                {"_id": 0, "status": 1}
             )
-            if vm_details:
-                active_vms.append(vm_details)
-        
+
+            if status_info:
+                active_vms.append(vm)
+
         return jsonify({"active_vms": active_vms}), 200
 
     except Exception as e:

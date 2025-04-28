@@ -48,7 +48,7 @@ app.add_url_rule('/register', 'register', auth.register, methods=['POST'])
 app.add_url_rule('/login', 'login', auth.login, methods=['POST'])
 
 # wg routes
-app.add_url_rule('/ui/wg/connect','connect-wg',ui_login_required(wg.connect_wg),methods=['POST'])
+app.add_url_rule('/cli/wg/connect','connect-wg',ui_login_required(wg.connect_wg),methods=['POST'])
 
                                         # CLI and UI common routes
 # vms routes
