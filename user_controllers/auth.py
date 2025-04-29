@@ -36,6 +36,8 @@ def register():
 
         if users_collection.find_one({"email": validated_data["email"]}):
             return jsonify({"error": "Email already exists"}), 400
+        if users_collection.find_one({"username": validated_data["username"]}):
+            return jsonify({"error": "Username already exists"}), 400
 
         validated_data["password"] = bcrypt.generate_password_hash(validated_data["password"]).decode("utf-8")
 
