@@ -91,12 +91,12 @@ def verify_token():
 
 
     if authorization.split(" ")[0] =="BearerCLI":      #means the request is from cli
-        print("cli authorization")
+        # print("cli authorization")
         token = authorization.split(" ")[1]
         # check the token in the db of cli session if its valid and not expired, here the token isn't a jwt token
         # it lies in the db of cli session
         try:
-            print(token)
+            # print(token)
             cli_details=cli_session_collection.find_one({"cli_session_token": token},{"cli_session_token_expiry_timestamp":1,"cli_id":1,"user_id":1})
             if not cli_details:
                 return jsonify({"error": "Invalid token"}), 401

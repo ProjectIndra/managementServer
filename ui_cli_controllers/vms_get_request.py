@@ -24,21 +24,29 @@ def vmStatus(subpath,user):
             return vmStatus_vm_start(request,user_id)
         elif subpath == "startCLI":      #this is called from cli to remove any vm
             responseRequest=modifyrequest(request,user_id) #modify the request to add the vm_id and provider_id
-            return vmStatus_vm_start(responseRequest,user_id)
+            if responseRequest[1] != 200:
+                return responseRequest
+            return vmStatus_vm_start(responseRequest[0],user_id)
         elif subpath == "stop":
             return vmStatus_vm_stop(request,user_id)
         elif subpath == "stopCLI":       #this is called from cli to remove any vm
             responseRequest=modifyrequest(request,user_id) #modify the request to add the vm_id and provider_id
-            return vmStatus_vm_stop(responseRequest,user_id)
+            if responseRequest[1] != 200:
+                return responseRequest
+            return vmStatus_vm_stop(responseRequest[0],user_id)
         elif subpath == "remove":
             return vmStatus_vm_remove(request,user_id)
         elif subpath == "removeCLI":    #this is called from cli to remove any vm
             responseRequest=modifyrequest(request,user_id) #modify the request to add the vm_id and provider_id
-            return vmStatus_vm_remove(responseRequest,user_id)
+            if responseRequest[1] != 200:
+                return responseRequest
+            return vmStatus_vm_remove(responseRequest[0],user_id)
         
         elif subpath == "forceRemoveCLI":
             responseRequest=modifyrequest(request,user_id)
-            return vmStatus_vm_forceRemove(responseRequest,user_id)
+            if responseRequest[1] != 200:
+                return responseRequest
+            return vmStatus_vm_forceRemove(responseRequest[0],user_id)
         # elif subpath == "create/verify_provider":
         #     return vmCreate_verifyprovider(request)
         # elif subpath == "create/verify_specs":
@@ -56,16 +64,20 @@ def modifyrequest(req, user_id):
             {"vm_name": vm_name, "vm_deleted":False, "client_user_id": user_id},
             {"_id": 0, "vm_id": 1, "provider_id": 1}
         )
+    
         if not vm_details:
+            print("vm not found")
             return jsonify({"error": "VM not found"}), 404
 
         new_args = req.args.to_dict()
         new_args['vm_id'] = vm_details.get('vm_id')
         new_args['provider_id'] = vm_details.get('provider_id')
 
+
         # Wrap in new ImmutableMultiDict to simulate a modified request
         req.args = ImmutableMultiDict(new_args)
-        return req
+        
+        return req,200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -74,7 +86,7 @@ def vmStatus_allActiveVms(user_id):
     Fetch and return the list of all active VMs for a specific user along with their WireGuard connection status.
     """
     try:
-        print(user_id)
+        print("user_id",user_id)
         active_vms = []
 
         query = {
@@ -122,7 +134,6 @@ def vmStatus_allVms(user_id):
 
         search_query=request.args.get('vm_name', None)
 
-        print("search_query",search_query)
         query={"client_user_id": user_id}
         if search_query:
             query['vm_name'] = { "$regex": f"^{search_query}", "$options": "i" }
@@ -161,8 +172,6 @@ def vmStatus_allVms(user_id):
             else:
                 pass
         
-        print("all_vms",all_vms)
-
         return {"all_vms": all_vms}, 200
     except Exception as e:
         return {"error": str(e)}, 500
@@ -202,7 +211,6 @@ def vmStatus_vm_stop(request,user_id):
     try:
         vm_id = request.args.get('vm_id')
         provider_id = request.args.get('provider_id')
-        print("here",request.args.get('provider_id'))
         # print(vm_id)
         # print(provider_id)
         # print(request.args)
@@ -254,6 +262,7 @@ def vmStatus_vm_remove(request,user_id):
             else:
                 return jsonify({"error": "Failed to delete the VM"}), 400
     except Exception as e:
+        print("error",e)
         return jsonify({"error": str(e)}), 500
 
 def vmStatus_vm_forceRemove(request,user_id):
