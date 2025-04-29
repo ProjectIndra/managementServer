@@ -4,7 +4,7 @@ from datetime import datetime
 # internal imports
 from models.providers import provider_details_collection , provider_conf_collection
 from models.providers import provider_schema, conf_schema
-from models.vmsModel import vm_details_collection
+from models.vmsModel import vm_details_collection, vm_status_collection
 from models.authModels import users_collection
 
 def providers(subpath):
@@ -108,26 +108,45 @@ def get_user_provider_details(user):
 
 def provider_client_details(user):
     """
-    This function is responsible for returning the all the clients of a user.
+    This function is responsible for returning all the clients of a user who have active VMs.
     """
     try:
-        user_id= user.get("user_id")
+        user_id = user.get("user_id")
         if not user_id:
             return jsonify({"error": "User ID is required"}), 400
-        
-        # print(user_id)
-        
-        # Fetching all the clients associated with the vms of the provider
-        vm_cllients= vm_details_collection.find({"provider_user_id": user_id},{"client_user_id":1})
 
-        # fetching all the clients details 
-        client_details_list=[]
-        for vm_client in vm_cllients:
-            client_user_id=vm_client.get("client_user_id")
-            client_details_list.append(
-                users_collection.find_one({"user_id": client_user_id},{"_id":0,"password":0,"cli_verification_token":0})
-            )
-        
+        # Fetch all VMs created by the provider
+        vm_clients_cursor = vm_details_collection.find(
+            {"provider_user_id": user_id},
+            {"client_user_id": 1, "vm_id": 1, "_id": 0}
+        )
+
+        client_details_list = []
+        seen_client_ids = set()
+
+        for vm_client in vm_clients_cursor:
+            client_user_id = vm_client.get("client_user_id")
+            vm_id = vm_client.get("vm_id")
+
+            if not client_user_id or not vm_id:
+                continue
+
+            is_vm_active = vm_status_collection.find_one({
+                "vm_id": vm_id,
+                "client_user_id": client_user_id,
+                "$or": [{"status": "active"}, {"status": "inactive"}],
+                "vm_deleted": False
+            })
+
+            if is_vm_active and client_user_id not in seen_client_ids:
+                client_details = users_collection.find_one(
+                    {"user_id": client_user_id},
+                    {"_id": 0, "password": 0, "cli_verification_token": 0}
+                )
+                if client_details:
+                    client_details_list.append(client_details)
+                    seen_client_ids.add(client_user_id)
+
         return jsonify({"client_details": client_details_list}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -135,8 +154,7 @@ def provider_client_details(user):
 
 def providers_details(request):
     """
-    This function is responsible
-    for returning the details of a given provider.
+    This function is responsible for returning the details of a given provider.
     """
     try:
         provider_id=request.args.get('provider_id')
