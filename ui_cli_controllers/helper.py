@@ -44,47 +44,71 @@ def providers_query_helper(request):
                 "provider_used_vms": 1,
                 "provider_used_networks": 1,
                 "provider_status": 1,
+                "provider_url":1,
+                "management_server_verification_token":1
             }
         )
 
         if not providers_details:
             return jsonify({"error": "Provider not found"}), 404
         
-        # Fetching the provider configuration details
-        provider_conf = provider_conf_collection.find_one(
-            {"provider_id": provider_id},
-            {
-                "_id": 0,  # Exclude MongoDB _id field
-                "provider_allowed_ram": 1,
-                "provider_allowed_vcpu": 1,
-                "provider_allowed_storage": 1,
-                "provider_allowed_vms": 1,
-                "provider_allowed_networks": 1
-            }
-        )
-        if not provider_conf:
-            return jsonify({"error": "Provider configuration not found"}), 404
-        
         # check whether the provider is active or not
         if providers_details["provider_status"]!="active":
             return jsonify({"error": "Provider is not active"}), 404
         
+        provider_url=providers_details["provider_url"]
+        management_server_verification_token=providers_details["management_server_verification_token"]
+        
+        # Fetching the provider configuration details
+        # provider_conf = provider_conf_collection.find_one(
+        #     {"provider_id": provider_id},
+        #     {
+        #         "_id": 0,  # Exclude MongoDB _id field
+        #         "provider_allowed_ram": 1,
+        #         "provider_allowed_vcpu": 1,
+        #         "provider_allowed_storage": 1,
+        #         "provider_allowed_vms": 1,
+        #         "provider_allowed_networks": 1
+        #     }
+        # )
+        # if not provider_conf:
+        #     return jsonify({"error": "Provider configuration not found"}), 404
+        
+        
         # check if the queried specs are less than the difference of the used and allowed specs
-        if ram and int(ram) > (int(provider_conf["provider_allowed_ram"]) - int(providers_details["provider_used_ram"])):
-            return jsonify({"error": "More specs(RAM) already being used by clients.",
-                            "can_create": False
-                            }), 200
+        # if ram and int(ram) > (int(provider_conf["provider_allowed_ram"]) - int(providers_details["provider_used_ram"])):
+        #     return jsonify({"error": "More specs(RAM) already being used by clients.",
+        #                     "can_create": False
+        #                     }), 200
     
-        if vcpus and int(vcpus) > (int(provider_conf["provider_allowed_vcpu"]) - int(providers_details["provider_used_vcpu"])):
-            return jsonify({"error": "More specs(vcpu) already being used by clients.",
-                            "can_create": False
-                            }), 200
+        # if vcpus and int(vcpus) > (int(provider_conf["provider_allowed_vcpu"]) - int(providers_details["provider_used_vcpu"])):
+        #     return jsonify({"error": "More specs(vcpu) already being used by clients.",
+        #                     "can_create": False
+        #                     }), 200
         
-        if storage and int(storage) > (int(provider_conf["provider_allowed_storage"]) - int(providers_details["provider_used_storage"])):
-            return jsonify({"error": "More specs(storage) already being used by clients.",
-                            "can_create": False
-                            }), 200
+        # if storage and int(storage) > (int(provider_conf["provider_allowed_storage"]) - int(providers_details["provider_used_storage"])):
+        #     return jsonify({"error": "More specs(storage) already being used by clients.",
+        #                     "can_create": False
+        #                     }), 200
+
+        queryData={
+            "vcpu":vcpus,
+            "memory":ram,
+            "storage":storage
+        }
+
+        headers = {
+        'authorization': management_server_verification_token
+        }
         
+        response=requests.post(f"{provider_url}/vm/queryvm", json=queryData, headers=headers)
+
+        if response.status_code != 200:
+            return jsonify({
+                "error": response.json().get("error"),
+                "can_create": False
+            }), response.status_code
+
         return jsonify({"can_create": True}), 200
     
     except Exception as e:

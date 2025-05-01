@@ -1,5 +1,6 @@
 from prometheus_api_client import PrometheusConnect
 from flask import request
+import requests
 import os
 from dotenv import load_dotenv
 
@@ -16,7 +17,7 @@ def query_prometheus(subpath):
     """
     try:
         # server_address = request.args.get("server_address")
-        server_address = request.json.get("server_address", "https//:pet-muskox-honestly.ngrok-free.app")
+        server_address = request.json.get("server_address", "https://pet-muskox-honestly.ngrok-free.app/metrics")
         server_address = server_address.replace("https://", "").replace("http://", "")
         if not server_address:
             return {"error": "Server address is required"}, 400
@@ -35,14 +36,13 @@ def query_prometheus(subpath):
 
 def vm_ram_used_query(server_address):
     try:
-        query_result = prom.custom_query(
-            query=f'vm_ram_allocated{{instance="{server_address}"}}'
-        )
+        query = f'vm_ram_used{{instance="{server_address}"}}'
+        query_result = prom.custom_query(query=query)
+        print(f"Query result for vm_ram_used: {query_result}")
         return query_result, 200
     except Exception as e:
         print(f"Error querying Prometheus: {e}")
         return {"error": "Failed to query RAM metric"}, 500
-
 
 def vm_cpu_used_query(server_address):
     try:

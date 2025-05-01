@@ -61,6 +61,14 @@ def connect_wg(user):
             return jsonify({"error": "Provider URL not found"}), 404
         
         response = setup_wireguard(provider_url, internal_vm_name, management_server_verification_token,cli_id, client_public_key, client_endpoint)
+
+        # ({'message': 'WireGuard setup completed successfully', 'public_key': '7exp0J47QFpy/Hc1P4+DmYT32hb7Vy/JtYH5/e1qVBQ=', 'status': 'active', 'wiregaurd_ip': '10.0.0.2/32'}, 200)
+
+
+        username,password=getImageUsernamePassword(internal_vm_name)
+        response[0]['username']=username
+        response[0]['password']=password
+
         if response[1] != 200:
             return response
         
@@ -113,19 +121,41 @@ def setup_wireguard(provider_url, internal_vm_name, management_server_verificati
     if wireguard_response.status_code != 200:
         return jsonify({"error":wireguard_response_json.get("error")}), wireguard_response.status_code
     # Update the wireguard details of the vm in the database
-    new_connection = {
-    "wireguard_ip": wireguard_response_json.get("wireguard_ip"),
-    "wireguard_public_key": wireguard_response_json.get("public_key"),
-    "cli_id": cli_id,
-    "wireguard_status": wireguard_response_json.get("status"),
-    }
 
-    # Update using internal_vm_name
-    vm_details_collection.update_one(
-        {"internal_vm_name": internal_vm_name},
-        {"$push": {"wireguard_connection_details": new_connection}}
+    update_result = vm_details_collection.update_one(
+        {
+            "internal_vm_name": internal_vm_name,
+            "wireguard_connection_details.cli_id": cli_id  # Check if cli_id exists
+        },
+        {
+            "$set": {
+                "wireguard_connection_details.$[elem].wireguard_ip": wireguard_response_json.get("wiregaurd_ip"),
+                "wireguard_connection_details.$[elem].wireguard_public_key": wireguard_response_json.get("public_key"),
+                "wireguard_connection_details.$[elem].wireguard_status": wireguard_response_json.get("status"),
+                "wireguard_connection_details.$[elem].wireguard_port": wireguard_response_json.get("wiregaurd_port"),
+            }
+        },
+        array_filters=[
+            {"elem.cli_id": cli_id}
+        ]
     )
-    
+
+    # If no existing cli_id matched, push as new
+    if update_result.matched_count == 0:
+        new_connection = {
+            "wireguard_ip": wireguard_response_json.get("wiregaurd_ip"),
+            "wireguard_public_key": wireguard_response_json.get("public_key"),
+            "cli_id": cli_id,
+            "wireguard_status": wireguard_response_json.get("status"),
+            "wireguard_port": wireguard_response_json.get("wiregaurd_port")
+        }
+
+        vm_details_collection.update_one(
+            {"internal_vm_name": internal_vm_name},
+            {"$push": {"wireguard_connection_details": new_connection}}
+        )
+
+        
     return wireguard_response_json, 200
 
 def get_dhcp_ip(provider_url, internal_vm_name, management_server_verification_token):
@@ -136,3 +166,11 @@ def get_dhcp_ip(provider_url, internal_vm_name, management_server_verification_t
 
     response = requests.post(f"{provider_url}/vm/ipaddresses", json={"vm_name": internal_vm_name},headers=headers)
     return response.json()
+
+
+def getImageUsernamePassword(internal_vm_name):
+    """
+    This function is responsible for getting the username and password of the vm image.
+    """
+    # For now returning hardcoded values
+    return "avinash","avinash"
