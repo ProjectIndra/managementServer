@@ -14,8 +14,14 @@ def connect_wg(user):
     try:
         data = request.get_json()
 
-        # provider_id=data.get('provider_id','f8c52abb-bfa5-44dc-8496-0b0a2fb5c394')
+        client_public_key=data.get('client_public_key')
+        client_endpoint=data.get('client_endpoint')
         vm_name=data.get('vm_name','test-vm')
+
+        if not client_public_key or not client_endpoint or not vm_name:
+            return jsonify({"error": "Missing required parameters"}), 400
+
+        # provider_id=data.get('provider_id','f8c52abb-bfa5-44dc-8496-0b0a2fb5c394')
         # cli_id=data.get('cli_id','123')
         # cli_session_token=data.get('cli_session_token','123')
 
@@ -54,16 +60,16 @@ def connect_wg(user):
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
-        response = setup_wireguard(provider_url, data, internal_vm_name, management_server_verification_token,cli_id)
-        if response.status_code != 200:
-            return jsonify({"error": "Failed to setup WireGuard"}), response.status_code
+        response = setup_wireguard(provider_url, internal_vm_name, management_server_verification_token,cli_id, client_public_key, client_endpoint)
+        if response[1] != 200:
+            return response
         
-        return jsonify(response), 200
+        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
 
-def setup_wireguard(provider_url,data,internal_vm_name,management_server_verification_token,cli_id):
+def setup_wireguard(provider_url, internal_vm_name, management_server_verification_token, cli_id, client_public_key, client_endpoint):
     """
     This function is responsible for setting up the wireguard connection.
     """
@@ -83,8 +89,11 @@ def setup_wireguard(provider_url,data,internal_vm_name,management_server_verific
     print(dhcp_response)
     vm_ip = dhcp_response.get('ip')
 
-    client_public_key=data.get('client_public_key', "Pb1j0VNQYKd7P3W9EfUI3GrzfKDLXv27PCZox3PB5w8="),
-    client_endpoint=data.get('client_endpoint', "192.168.0.162:3000")
+    # client_public_key=data.get('client_public_key', "Pb1j0VNQYKd7P3W9EfUI3GrzfKDLXv27PCZox3PB5w8="),
+    # client_public_key=data.get('client_public_key')
+    # client_endpoint=data.get('client_endpoint', "192.168.0.162:3000")
+
+    print("client_public_key",client_public_key)
 
     headers = {
         'authorization': management_server_verification_token
