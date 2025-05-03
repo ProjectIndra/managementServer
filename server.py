@@ -26,7 +26,7 @@ def home():
     """
 
     """
-    return "Hello, Welcome to the management server",200
+    return "Namaste, Welcome to the management server",200
 
 # Prometheus metrics route
 app.add_url_rule('/prometheus/query/<path:subpath>', 'metrics', prometheus_metrics.query_prometheus, methods=["GET"])
