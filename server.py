@@ -97,7 +97,7 @@ app.add_url_rule('/hdfs/rename', 'rename_file_folder', ui_login_required(hdfs.re
 if __name__ == '__main__':
     try:
         port = int(os.getenv("PORT") or 5000)
-        print(f"Starting server on port {port}...")
+        print(f"Starting the server on port {port}...")
         app.run(debug=True, port=port, host='0.0.0.0')
     except Exception as e:
         print(f"Error: {str(e)}")
