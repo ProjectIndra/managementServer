@@ -3,7 +3,7 @@ name: Run script for management server
 on: 
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
