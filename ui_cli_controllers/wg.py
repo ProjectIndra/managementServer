@@ -27,7 +27,7 @@ def generate_wireguard_keypair():
     private_key_b64 = base64.standard_b64encode(private_key_bytes).decode('ascii')
     public_key_b64 = base64.standard_b64encode(public_key_bytes).decode('ascii')
 
-    return private_key_b64, public_key_b64
+    return public_key_b64, private_key_b64
 
 
 def connect_wg(user):
