@@ -1,11 +1,34 @@
 from flask import request,jsonify
 import requests
-import time
+import nacl.public
+import base64
+import os
+from dotenv import load_dotenv
 
 # internal imports
 from models.vmsModel import vm_status_collection, vm_details_collection
 from models.providers import provider_details_collection
 from models.authModels import cli_session_collection
+
+load_dotenv()
+NETWORK_SERVER = os.getenv("NETWORK_SERVER")
+
+def generate_wireguard_keypair():
+    # Generate a new private key (32 random bytes)
+    private_key = nacl.public.PrivateKey.generate()
+
+    # Private key bytes
+    private_key_bytes = private_key.encode()
+
+    # Corresponding public key
+    public_key_bytes = private_key.public_key.encode()
+
+    # Base64 encode like wg expects
+    private_key_b64 = base64.standard_b64encode(private_key_bytes).decode('ascii')
+    public_key_b64 = base64.standard_b64encode(public_key_bytes).decode('ascii')
+
+    return private_key_b64, public_key_b64
+
 
 def connect_wg(user):
     """
@@ -14,26 +37,15 @@ def connect_wg(user):
     try:
         data = request.get_json()
 
-        client_public_key=data.get('client_public_key')
-        client_endpoint=data.get('client_endpoint')
         vm_name=data.get('vm_name','test-vm')
+        interface_name=data.get('interface_name','wg0')
 
-        if not client_public_key or not client_endpoint or not vm_name:
-            return jsonify({"error": "Missing required parameters"}), 400
+        if not vm_name or not interface_name:
+            return jsonify({"error": "Missing vm_name or interface_name"}), 400
 
-        # provider_id=data.get('provider_id','f8c52abb-bfa5-44dc-8496-0b0a2fb5c394')
-        # cli_id=data.get('cli_id','123')
-        # cli_session_token=data.get('cli_session_token','123')
-
-        # # verifying the cli session token along with it's expiry
-        # cli_session=cli_session_collection.find_one({"cli_session_token":cli_session_token,"cli_id":cli_id},{"_id":0,"cli_session_token":1,"cli_session_token_expiry_timestamp":1,"user_id":1})
-        # if not cli_session:
-        #     return jsonify({"error": "Invalid session token"}), 401
-        # if cli_session.get('cli_session_token_expiry_timestamp') < time.time():
-        #     return jsonify({"error": "Session token expired"}), 401
-        
         user_id=user.get('user_id')
         cli_id=user.get('cli_id')
+
 
         # fetching provider_id from the db using user_id and vm_name
         vm_status_details=vm_status_collection.find_one({"vm_name":vm_name,"client_user_id":user_id,"status":'active'})
@@ -47,9 +59,6 @@ def connect_wg(user):
         provider_id=vm_details.get('provider_id')
         internal_vm_name=vm_details.get('internal_vm_name')
 
-        print("user_id",user_id)
-        print("vm_details",vm_details)
-
         # fetching provider url from the DB using provider_id
         provider_url_response=provider_details_collection.find_one({"provider_id":provider_id},{"_id":0,"provider_url":1,"management_server_verification_token":1})
         if not provider_url_response:
@@ -60,101 +69,107 @@ def connect_wg(user):
         if not provider_url:
             return jsonify({"error": "Provider URL not found"}), 404
         
-        response = setup_wireguard(provider_url, internal_vm_name, management_server_verification_token,cli_id, client_public_key, client_endpoint)
+        # sending the client details to the network server after generating the public key and private key
 
-        # ({'message': 'WireGuard setup completed successfully', 'public_key': '7exp0J47QFpy/Hc1P4+DmYT32hb7Vy/JtYH5/e1qVBQ=', 'status': 'active', 'wiregaurd_ip': '10.0.0.2/32'}, 200)
+        client_public_key, client_private_key = generate_wireguard_keypair()
 
+        client_add_peer_response = requests.post(f"{NETWORK_SERVER}/api/addPeer", json={
+            "interface_name": interface_name,
+            "peer_name": cli_id + "->" + vm_id,
+            "public_key": client_public_key,
+        })
+        print("user_id",client_add_peer_response.json())
+        client_add_peer_response_json = client_add_peer_response.json()
+        if client_add_peer_response.status_code != 200:
+            return jsonify({"error": client_add_peer_response_json.get("error")}), client_add_peer_response.status_code
+        
+        client_interface_details = client_add_peer_response_json.get("interface_details")
 
-        username,password=getImageUsernamePassword(internal_vm_name)
-        response[0]['username']=username
-        response[0]['password']=password
+        # sending the vm details to the network server after generating the public key and private key
+        
+        vm_public_key, vm_private_key = generate_wireguard_keypair()
+        vm_add_peer_response = requests.post(f"{NETWORK_SERVER}/api/addPeer", json={
+            "interface_name": interface_name,
+            "peer_name": vm_id + "->" + cli_id,
+            "public_key": vm_public_key,
+        })
+        vm_add_peer_response_json = vm_add_peer_response.json()
+        if vm_add_peer_response.status_code != 200:
+            return jsonify({"error": vm_add_peer_response_json.get("error","")}), vm_add_peer_response.status_code
+        vm_interface_details = vm_add_peer_response_json.get("interface_details")
+
+        combined_interface_details = {
+            "interface_allowed_ips": client_interface_details.get("interface_allowed_ips"),
+            "interface_endpoint": client_interface_details.get("interface_endpoint"),
+            "interface_name": client_interface_details.get("interface_name"),
+            "interface_public_key": client_interface_details.get("interface_public_key"),
+            "client_peer_name": client_interface_details.get("peer_name"),
+            "client_peer_address": client_interface_details.get("peer_address"),
+            "client_peer_public_key": client_interface_details.get("peer_public_key"),
+            "client_peer_private_key": client_private_key,
+            "vm_peer_name": vm_interface_details.get("peer_name"),
+            "vm_peer_address": vm_interface_details.get("peer_address"),
+            "vm_peer_public_key": vm_interface_details.get("peer_public_key"),
+            "vm_peer_private_key": vm_private_key,
+        }
+
+        response = setup_wireguard(provider_url, internal_vm_name,  management_server_verification_token, cli_id, combined_interface_details)
 
         if response[1] != 200:
             return response
         
-        return response
+        return combined_interface_details, 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
 
-def setup_wireguard(provider_url, internal_vm_name, management_server_verification_token, cli_id, client_public_key, client_endpoint):
+def setup_wireguard(provider_url, internal_vm_name, management_server_verification_token, cli_id,combined_interface_details):
     """
     This function is responsible for setting up the wireguard connection.
     """
 
-    # # first getting ip address of the vm
-    # vm_id=data.get('vm_id', 123)
-    # # fetching internal_vm_name from the db using vm_id
-    # vm_details = vm_details_collection.find_one(
-    #     {"vm_id": vm_id},
-    #     {"_id": 0, "internal_vm_name": 1}
-    # )
-    # if not vm_details:
-    #     return jsonify({"error": "VM not found"}), 404
-    # internal_vm_name = vm_details.get('internal_vm_name')
-
     dhcp_response = get_dhcp_ip(provider_url, internal_vm_name, management_server_verification_token)
-    print(dhcp_response)
+    
     vm_ip = dhcp_response.get('ip')
-
-    # client_public_key=data.get('client_public_key', "Pb1j0VNQYKd7P3W9EfUI3GrzfKDLXv27PCZox3PB5w8="),
-    # client_public_key=data.get('client_public_key')
-    # client_endpoint=data.get('client_endpoint', "192.168.0.162:3000")
-
-    print("client_public_key",client_public_key)
 
     headers = {
         'authorization': management_server_verification_token
     }
 
-    print(vm_ip)
-
     wireguard_response = requests.post(f"{provider_url}/vm/ssh/setup_wireguard", json={
         "vm_ip": vm_ip,
-        "client_id": cli_id,
-        "client_public_key": client_public_key,
-        "client_endpoint": client_endpoint
+        "combined_interface_details": combined_interface_details,
     },headers=headers)
 
     wireguard_response_json = wireguard_response.json()
 
     if wireguard_response.status_code != 200:
         return jsonify({"error":wireguard_response_json.get("error")}), wireguard_response.status_code
+
+    # adding cli_id in combined_interface_details
+    combined_interface_details["cli_id"] = cli_id
+    
     # Update the wireguard details of the vm in the database
 
+    # Try to update the existing entry with the same cli_id
     update_result = vm_details_collection.update_one(
         {
             "internal_vm_name": internal_vm_name,
-            "wireguard_connection_details.cli_id": cli_id  # Check if cli_id exists
+            "combined_interface_details.cli_id": cli_id
         },
         {
             "$set": {
-                "wireguard_connection_details.$[elem].wireguard_ip": wireguard_response_json.get("wiregaurd_ip"),
-                "wireguard_connection_details.$[elem].wireguard_public_key": wireguard_response_json.get("public_key"),
-                "wireguard_connection_details.$[elem].wireguard_status": wireguard_response_json.get("status"),
-                "wireguard_connection_details.$[elem].wireguard_port": wireguard_response_json.get("wiregaurd_port"),
+                "combined_interface_details.$": combined_interface_details
             }
-        },
-        array_filters=[
-            {"elem.cli_id": cli_id}
-        ]
+        }
     )
 
-    # If no existing cli_id matched, push as new
+    # If cli_id not found, push it as new entry
     if update_result.matched_count == 0:
-        new_connection = {
-            "wireguard_ip": wireguard_response_json.get("wiregaurd_ip"),
-            "wireguard_public_key": wireguard_response_json.get("public_key"),
-            "cli_id": cli_id,
-            "wireguard_status": wireguard_response_json.get("status"),
-            "wireguard_port": wireguard_response_json.get("wiregaurd_port")
-        }
-
         vm_details_collection.update_one(
             {"internal_vm_name": internal_vm_name},
-            {"$push": {"wireguard_connection_details": new_connection}}
+            {"$push": {"combined_interface_details": combined_interface_details}}
         )
-
         
     return wireguard_response_json, 200
 
@@ -166,11 +181,3 @@ def get_dhcp_ip(provider_url, internal_vm_name, management_server_verification_t
 
     response = requests.post(f"{provider_url}/vm/ipaddresses", json={"vm_name": internal_vm_name},headers=headers)
     return response.json()
-
-
-def getImageUsernamePassword(internal_vm_name):
-    """
-    This function is responsible for getting the username and password of the vm image.
-    """
-    # For now returning hardcoded values
-    return "avinash","avinash"

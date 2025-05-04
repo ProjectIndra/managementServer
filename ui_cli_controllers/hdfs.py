@@ -14,6 +14,8 @@ def file_path_translation(original_path,username):
     new_path = f"""{username}/{original_path}"""
     return new_path
 
+load_dotenv()
+HDFS_SERVER = os.getenv("HDFS_SERVER")
 
 def upload_file_folder(user):
     try:
@@ -41,8 +43,6 @@ def upload_file_folder(user):
         new_path = file_path_translation(path,username)
      
 
-        load_dotenv()
-        HDFS_SERVER = os.getenv("HDFS_SERVER")
         if not HDFS_SERVER:
             return jsonify({'error': 'HDFS_SERVER not configured in .env'}), 500
 
@@ -102,9 +102,6 @@ def list_files_folders(user):
         if path is None:
             return jsonify({"error": "Missing path"}), 400
 
-        load_dotenv()
-        HDFS_SERVER = os.getenv("HDFS_SERVER")
-
         new_path = file_path_translation(path, username)
 
         res = requests.post(f"{HDFS_SERVER}/list", json={"path": new_path})
@@ -156,8 +153,7 @@ def rename_file_folder(user):
         username = user.get("username")
         if not old_path or not new_name or not user_id:
             return jsonify({"error": "Missing required parameters"}), 400
-        load_dotenv()
-        HDFS_SERVER = os.getenv("HDFS_SERVER")
+        
         old_path = file_path_translation(old_path, username)
         new_path = "/".join(old_path.split("/")[:-1] + [new_name])
 
@@ -190,8 +186,6 @@ def make_directory(user):
         if not path or not user_id:
             return jsonify({"error": "Missing path or user_id"}), 400
 
-        load_dotenv()
-        HDFS_SERVER = os.getenv("HDFS_SERVER")
 
         new_path = file_path_translation(path, username)
         res = requests.post(f"{HDFS_SERVER}/mkdir", json={"path": new_path})
@@ -231,9 +225,6 @@ def delete(user):
 
         if not paths_array or not user_id:
             return jsonify({"error": "Missing paths or user_id"}), 400
-
-        load_dotenv()
-        HDFS_SERVER = os.getenv("HDFS_SERVER")
 
         results = []
         for path in paths_array:
